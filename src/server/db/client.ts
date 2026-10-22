@@ -3,7 +3,8 @@ import postgres from "postgres";
 import * as schema from "./schema";
 
 export function createDb(url: string) {
-  const sqlClient = postgres(url, { max: 10 });
+  // prepare: false es necesario con el transaction pooler de Supabase.
+  const sqlClient = postgres(url, { max: 10, prepare: false });
   return { db: drizzle(sqlClient, { schema }), sqlClient };
 }
 

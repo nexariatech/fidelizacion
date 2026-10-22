@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -15,7 +15,10 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Fidelización",
   description: "Programa de puntos y recompensas para comercios",
+  manifest: "/manifest.webmanifest",
 };
+
+export const viewport: Viewport = { width: "device-width", initialScale: 1, themeColor: "#4f46e5" };
 
 export default function RootLayout({
   children,
