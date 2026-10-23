@@ -18,6 +18,10 @@ export default async function CustomerHome() {
           <div className="mx-auto w-60" dangerouslySetInnerHTML={{ __html: qrSvg }} />
           <p className="text-sm text-neutral-600">Muéstralo en la caja para sumar puntos.</p>
           <p className="text-xs text-neutral-500">Este QR solo te identifica: no sirve para canjear puntos.</p>
+          <details className="text-xs text-neutral-500">
+            <summary className="cursor-pointer">Ver código del QR</summary>
+            <code className="mt-1 block break-all select-all rounded bg-neutral-100 p-2">{customer.qrToken}</code>
+          </details>
           <form action={rotateQrAction}>
             <button className="text-xs text-neutral-500 underline hover:text-neutral-800">
               Generar un QR nuevo (invalida el actual)
