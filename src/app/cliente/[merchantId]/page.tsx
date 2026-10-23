@@ -5,6 +5,8 @@ import { requireViewer } from "@/server/auth/session";
 import { getDb } from "@/server/db/client";
 import { DomainError } from "@/server/domain/errors";
 import { customerMerchantDetail } from "@/server/services/queries";
+import { isGoogleWalletEnabled } from "@/server/services/wallet";
+import { GoogleWalletButton } from "./google-wallet-button";
 import { RedeemReward } from "./redeem-reward";
 
 export default async function CustomerMerchantPage({ params }: { params: Promise<{ merchantId: string }> }) {
@@ -24,6 +26,8 @@ export default async function CustomerMerchantPage({ params }: { params: Promise
         </div>
         <p className="text-3xl font-bold text-indigo-700">{detail.balance} pts</p>
       </div>
+
+      {isGoogleWalletEnabled() && <GoogleWalletButton merchantId={merchantId} />}
 
       <Card title="Recompensas">
         {detail.rewards.length === 0 ? (

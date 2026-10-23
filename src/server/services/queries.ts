@@ -80,6 +80,7 @@ export async function customerMerchantDetail(db: DbOrTx, customerId: string, mer
   return {
     merchant: { id: row.merchant.id, name: row.merchant.name, status: row.merchant.status },
     program: { name: row.program.name, active: row.program.active },
+    membershipId: row.membership.id,
     balance: row.membership.balance,
     rewards: rewardList,
     branches: branchList,
