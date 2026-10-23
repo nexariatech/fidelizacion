@@ -24,17 +24,22 @@ export type CustomerContext = {
 // Se arma en el servidor a partir del usuario autenticado; nunca a partir de
 // datos enviados por el navegador.
 export async function loadStaffContext(db: DbOrTx, authUserId: string): Promise<StaffContext | null> {
-  const [user] = await db.select().from(staffUsers).where(eq(staffUsers.authUserId, authUserId));
-  if (!user) return null;
-  const assignments = await db
+  const rows = await db
     .select({
+      id: staffUsers.id,
+      isPlatformAdmin: staffUsers.isPlatformAdmin,
       merchantId: staffAssignments.merchantId,
       branchId: staffAssignments.branchId,
       role: staffAssignments.role,
     })
-    .from(staffAssignments)
-    .where(eq(staffAssignments.staffUserId, user.id));
-  return { kind: "staff", staffUserId: user.id, isPlatformAdmin: user.isPlatformAdmin, assignments };
+    .from(staffUsers)
+    .leftJoin(staffAssignments, eq(staffAssignments.staffUserId, staffUsers.id))
+    .where(eq(staffUsers.authUserId, authUserId));
+  if (rows.length === 0) return null;
+  const assignments = rows.flatMap((r) =>
+    r.merchantId && r.role ? [{ merchantId: r.merchantId, branchId: r.branchId, role: r.role }] : [],
+  );
+  return { kind: "staff", staffUserId: rows[0].id, isPlatformAdmin: rows[0].isPlatformAdmin, assignments };
 }
 
 export async function loadCustomerContext(db: DbOrTx, authUserId: string): Promise<CustomerContext | null> {

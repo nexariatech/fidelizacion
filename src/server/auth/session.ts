@@ -17,20 +17,22 @@ export type Viewer = {
 // cliente (se crea en el primer acceso); el rol de personal es adicional.
 export const getViewer = cache(async (): Promise<Viewer | null> => {
   const supabase = await createSupabaseServerClient();
-  const { data } = await supabase.auth.getUser();
-  const user = data.user;
-  if (!user?.email) return null;
+  const { data } = await supabase.auth.getClaims();
+  const claims = data?.claims;
+  const authUserId = claims?.sub;
+  const email = typeof claims?.email === "string" ? claims.email : null;
+  if (!authUserId || !email) return null;
 
   const db = getDb();
-  let customer = await loadCustomerContext(db, user.id);
+  let [customer, staff] = await Promise.all([loadCustomerContext(db, authUserId), loadStaffContext(db, authUserId)]);
   if (!customer) {
-    const fullName = String(user.user_metadata?.full_name ?? "").trim() || user.email.split("@")[0];
-    await createCustomerProfile(db, { authUserId: user.id, fullName, email: user.email }).catch(() => undefined);
-    customer = await loadCustomerContext(db, user.id);
+    const metadata = (claims.user_metadata ?? {}) as { full_name?: unknown };
+    const fullName = String(metadata.full_name ?? "").trim() || email.split("@")[0];
+    await createCustomerProfile(db, { authUserId, fullName, email }).catch(() => undefined);
+    customer = await loadCustomerContext(db, authUserId);
     if (!customer) throw new Error("No se pudo crear el perfil del cliente");
   }
-  const staff = await loadStaffContext(db, user.id);
-  return { authUserId: user.id, email: user.email, customer, staff };
+  return { authUserId, email, customer, staff };
 });
 
 export async function requireViewer(): Promise<Viewer> {

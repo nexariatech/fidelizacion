@@ -18,7 +18,9 @@ export async function middleware(request: NextRequest) {
       },
     },
   });
-  await supabase.auth.getUser();
+  // getClaims valida el JWT localmente (claves asimétricas) y solo llama a
+  // Supabase cuando hay que refrescar la sesión.
+  await supabase.auth.getClaims();
   return response;
 }
 
