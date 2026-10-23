@@ -31,8 +31,8 @@ export default async function AdminPage() {
             <Field label="Nombre">
               <Input name="name" required />
             </Field>
-            <Field label="Identificador" hint="Minúsculas, números y guiones">
-              <Input name="slug" pattern="[a-z0-9\-]{3,60}" required />
+            <Field label="Identificador corto (opcional)" hint="Se genera del nombre si lo dejas vacío. Ej: cafe-central">
+              <Input name="slug" placeholder="cafe-central" />
             </Field>
             <Field label="Primera sucursal">
               <Input name="branchName" defaultValue="Casa central" required />
