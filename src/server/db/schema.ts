@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import {
   boolean,
   check,
+  date,
   foreignKey,
   index,
   integer,
@@ -31,6 +32,9 @@ export const customers = pgTable("customers", {
   fullName: text("full_name").notNull(),
   email: text("email").notNull().unique(),
   phone: text("phone"),
+  birthDate: date("birth_date"),
+  // Se marca la primera vez que el cliente completa teléfono y cumpleaños.
+  profileCompletedAt: timestamp("profile_completed_at", { withTimezone: true }),
   // Identificador opaco del QR personal. Se reemplaza si se compromete.
   qrToken: text("qr_token").notNull().unique(),
   createdAt: createdAt(),
@@ -117,9 +121,14 @@ export const loyaltyPrograms = pgTable(
     accrualBase: accrualBase("accrual_base").notNull().default("total"),
     pointsPerUnit: integer("points_per_unit").notNull(),
     unitAmountCents: integer("unit_amount_cents").notNull(),
+    // Puntos de regalo por completar los datos del perfil; 0 lo desactiva.
+    profileBonusPoints: integer("profile_bonus_points").notNull().default(50),
     createdAt: createdAt(),
   },
-  (t) => [check("loyalty_programs_rule", sql`${t.pointsPerUnit} > 0 and ${t.unitAmountCents} > 0`)],
+  (t) => [
+    check("loyalty_programs_rule", sql`${t.pointsPerUnit} > 0 and ${t.unitAmountCents} > 0`),
+    check("loyalty_programs_profile_bonus", sql`${t.profileBonusPoints} >= 0`),
+  ],
 );
 
 // Participación de un cliente en el programa de un comercio. El saldo se comparte
@@ -132,6 +141,8 @@ export const programMemberships = pgTable(
     merchantId: uuid("merchant_id").notNull().references(() => merchants.id),
     customerId: uuid("customer_id").notNull().references(() => customers.id),
     balance: integer("balance").notNull().default(0),
+    // El regalo por completar el perfil se acredita una sola vez por membresía.
+    profileBonusGrantedAt: timestamp("profile_bonus_granted_at", { withTimezone: true }),
     createdAt: createdAt(),
   },
   (t) => [
@@ -257,6 +268,7 @@ export const movementType = pgEnum("point_movement_type", [
   "purchase_void",
   "redemption",
   "redemption_cancel",
+  "profile_bonus",
 ]);
 
 // Libro de movimientos: inmutable, nunca se edita ni se borra.
@@ -266,7 +278,8 @@ export const pointMovements = pgTable(
   {
     id: id(),
     merchantId: uuid("merchant_id").notNull().references(() => merchants.id),
-    branchId: uuid("branch_id").notNull().references(() => branches.id),
+    // Nulo solo en movimientos que no ocurren en una caja (regalo por perfil).
+    branchId: uuid("branch_id").references(() => branches.id),
     membershipId: uuid("membership_id").notNull().references(() => programMemberships.id),
     type: movementType("type").notNull(),
     points: integer("points").notNull(),
@@ -279,6 +292,9 @@ export const pointMovements = pgTable(
   (t) => [
     index("point_movements_membership_idx").on(t.membershipId, t.createdAt),
     check("point_movements_nonzero", sql`${t.points} <> 0`),
+    // ::text porque Postgres no permite usar un valor nuevo del enum en la
+    // misma transacción que lo agrega.
+    check("point_movements_branch", sql`${t.branchId} is not null or ${t.type}::text = 'profile_bonus'`),
   ],
 );
 

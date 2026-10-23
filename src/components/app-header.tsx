@@ -14,6 +14,9 @@ export function AppHeader({ viewer }: { viewer: Viewer }) {
           <Link href="/cliente" className="text-neutral-700 hover:text-indigo-700">
             Mis puntos
           </Link>
+          <Link href="/cliente/perfil" className="text-neutral-700 hover:text-indigo-700">
+            Mis datos
+          </Link>
           {isStaff && (
             <Link href="/comercio" className="text-neutral-700 hover:text-indigo-700">
               Comercio

@@ -117,6 +117,7 @@ export async function updateProgramAction(_: ActionState, formData: FormData): P
       accrualBase: text(formData, "accrualBase") === "eligible" ? "eligible" : "total",
       pointsPerUnit: int(formData, "pointsPerUnit"),
       unitAmountCents,
+      profileBonusPoints: int(formData, "profileBonusPoints"),
     });
     return "Programa actualizado.";
   });

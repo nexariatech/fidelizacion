@@ -22,7 +22,11 @@ import { DomainError } from "../domain/errors";
 
 export async function customerOverview(db: DbOrTx, customerId: string) {
   const [customer] = await db
-    .select({ fullName: customers.fullName, qrToken: customers.qrToken })
+    .select({
+      fullName: customers.fullName,
+      qrToken: customers.qrToken,
+      profileComplete: customers.profileCompletedAt,
+    })
     .from(customers)
     .where(eq(customers.id, customerId));
   const memberships = await db
@@ -40,11 +44,31 @@ export async function customerOverview(db: DbOrTx, customerId: string) {
   return { customer, memberships };
 }
 
+export async function customerProfile(db: DbOrTx, customerId: string) {
+  const [customer] = await db
+    .select({
+      fullName: customers.fullName,
+      email: customers.email,
+      phone: customers.phone,
+      birthDate: customers.birthDate,
+      profileCompletedAt: customers.profileCompletedAt,
+    })
+    .from(customers)
+    .where(eq(customers.id, customerId));
+  return customer;
+}
+
 // Detalle del cliente en un comercio. Solo devuelve datos si tiene membresía.
 export async function customerMerchantDetail(db: DbOrTx, customerId: string, merchantId: string) {
   const [row] = await db
-    .select({ membership: programMemberships, merchant: merchants, program: loyaltyPrograms })
+    .select({
+      membership: programMemberships,
+      merchant: merchants,
+      program: loyaltyPrograms,
+      profileCompletedAt: customers.profileCompletedAt,
+    })
     .from(programMemberships)
+    .innerJoin(customers, eq(customers.id, programMemberships.customerId))
     .innerJoin(merchants, eq(merchants.id, programMemberships.merchantId))
     .innerJoin(loyaltyPrograms, eq(loyaltyPrograms.id, programMemberships.programId))
     .where(and(eq(programMemberships.customerId, customerId), eq(programMemberships.merchantId, merchantId)));
@@ -71,7 +95,7 @@ export async function customerMerchantDetail(db: DbOrTx, customerId: string, mer
         createdAt: pointMovements.createdAt,
       })
       .from(pointMovements)
-      .innerJoin(branches, eq(branches.id, pointMovements.branchId))
+      .leftJoin(branches, eq(branches.id, pointMovements.branchId))
       .where(eq(pointMovements.membershipId, row.membership.id))
       .orderBy(desc(pointMovements.createdAt))
       .limit(30),
@@ -79,8 +103,10 @@ export async function customerMerchantDetail(db: DbOrTx, customerId: string, mer
 
   return {
     merchant: { id: row.merchant.id, name: row.merchant.name, status: row.merchant.status },
-    program: { name: row.program.name, active: row.program.active },
+    program: { name: row.program.name, active: row.program.active, profileBonusPoints: row.program.profileBonusPoints },
     membershipId: row.membership.id,
+    profileBonusGranted: row.membership.profileBonusGrantedAt !== null,
+    profileComplete: row.profileCompletedAt !== null,
     balance: row.membership.balance,
     rewards: rewardList,
     branches: branchList,

@@ -7,7 +7,7 @@ import { DomainError } from "../domain/errors";
 import { calculatePoints } from "../domain/points";
 import { parse } from "../domain/validation";
 import { audit } from "./audit";
-import { lockMembership } from "./memberships";
+import { ensureMembership } from "./memberships";
 
 const registerPurchaseInput = z.object({
   branchId: z.uuid(),
@@ -44,12 +44,8 @@ export async function registerPurchase(db: Db, ctx: StaffContext, rawInput: Regi
       .where(eq(customers.qrToken, input.qrToken));
     if (!customer) throw new DomainError("not_found", "Cliente no encontrado");
 
-    // La membresía se crea en la primera compra del cliente en este comercio.
-    await tx
-      .insert(programMemberships)
-      .values({ programId: program.id, merchantId: branch.merchantId, customerId: customer.id })
-      .onConflictDoNothing();
-    const membership = await lockMembership(tx, program.id, customer.id);
+    // La membresía se crea en la primera compra si el cliente no se unió antes.
+    const membership = await ensureMembership(tx, program, customer.id);
 
     // Con la membresía bloqueada, los reintentos concurrentes del mismo cliente
     // se serializan y este chequeo ve la compra ya confirmada.

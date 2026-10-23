@@ -8,6 +8,7 @@ import { customerMerchantDetail } from "@/server/services/queries";
 import { isGoogleWalletEnabled } from "@/server/services/wallet";
 import { GoogleWalletButton } from "./google-wallet-button";
 import { RedeemReward } from "./redeem-reward";
+import { ProfileBanner } from "../profile-banner";
 
 export default async function CustomerMerchantPage({ params }: { params: Promise<{ merchantId: string }> }) {
   const { merchantId } = await params;
@@ -26,6 +27,10 @@ export default async function CustomerMerchantPage({ params }: { params: Promise
         </div>
         <p className="text-3xl font-bold text-indigo-700">{detail.balance} pts</p>
       </div>
+
+      {!detail.profileComplete && detail.program.profileBonusPoints > 0 && (
+        <ProfileBanner points={detail.program.profileBonusPoints} />
+      )}
 
       {isGoogleWalletEnabled() && <GoogleWalletButton merchantId={merchantId} />}
 
@@ -62,7 +67,8 @@ export default async function CustomerMerchantPage({ params }: { params: Promise
                 <tr key={m.id}>
                   <td className="py-2 text-neutral-500">{formatDate(m.createdAt)}</td>
                   <td className="py-2">
-                    {movementLabels[m.type]} · {m.branchName}
+                    {movementLabels[m.type]}
+                    {m.branchName && ` · ${m.branchName}`}
                   </td>
                   <td className={`py-2 text-right font-medium ${m.points > 0 ? "text-green-700" : "text-red-700"}`}>
                     {m.points > 0 ? "+" : ""}

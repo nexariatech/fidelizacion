@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import QRCode from "qrcode";
 import {
   assignEmployeeAction,
   cancelRedemptionAction,
@@ -11,6 +12,7 @@ import {
 import { ActionForm } from "@/components/action-form";
 import { Badge, Card, Empty, Field, Input, Select } from "@/components/ui";
 import { formatDate, formatMoney } from "@/lib/format";
+import { requestOrigin } from "@/lib/origin";
 import { requireStaff } from "@/server/auth/session";
 import { getDb } from "@/server/db/client";
 import { DomainError } from "@/server/domain/errors";
@@ -24,6 +26,8 @@ export default async function OwnerPage({ params }: { params: Promise<{ merchant
     throw e;
   });
   const hidden = <input type="hidden" name="merchantId" value={merchantId} />;
+  const joinUrl = `${await requestOrigin()}/unirse/${d.merchant.slug}`;
+  const joinQrSvg = await QRCode.toString(joinUrl, { type: "svg", margin: 1, width: 220 });
 
   return (
     <>
@@ -42,6 +46,16 @@ export default async function OwnerPage({ params }: { params: Promise<{ merchant
           </div>
         ))}
       </div>
+
+      <Card title="QR para el mostrador">
+        <div className="flex flex-wrap items-center gap-6">
+          <div className="w-44 shrink-0" dangerouslySetInnerHTML={{ __html: joinQrSvg }} />
+          <div className="min-w-0 space-y-2 text-sm text-neutral-600">
+            <p>Imprímelo y déjalo a la vista. El cliente lo escanea, entra con Google y queda registrado en tu programa.</p>
+            <code className="block break-all select-all rounded bg-neutral-100 p-2 text-xs">{joinUrl}</code>
+          </div>
+        </div>
+      </Card>
 
       <div className="grid gap-6 md:grid-cols-2">
         <Card title="Programa de puntos">
@@ -63,6 +77,9 @@ export default async function OwnerPage({ params }: { params: Promise<{ merchant
                 <option value="total">Importe total de la compra</option>
                 <option value="eligible">Importe elegible que informa el empleado</option>
               </Select>
+            </Field>
+            <Field label="Regalo por completar datos (pts)" hint="Se acredita una vez por cliente. 0 lo desactiva.">
+              <Input name="profileBonusPoints" type="number" min={0} defaultValue={d.program.profileBonusPoints} required />
             </Field>
             <label className="flex items-center gap-2 text-sm">
               <input type="checkbox" name="active" defaultChecked={d.program.active} /> Programa activo

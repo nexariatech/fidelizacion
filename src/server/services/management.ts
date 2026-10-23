@@ -78,6 +78,7 @@ const updateProgramInput = z.object({
   merchantId: z.uuid(),
   name: z.string().trim().min(2).max(120),
   active: z.boolean(),
+  profileBonusPoints: z.number().int().min(0).max(100_000).optional(),
   ...ruleFields,
 });
 

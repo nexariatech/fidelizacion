@@ -6,7 +6,7 @@ SaaS de fidelización multi-comercio y multi-sucursal: el cliente se identifica 
 
 - Next.js (App Router) + TypeScript
 - PostgreSQL (Supabase en producción) con Drizzle ORM
-- Supabase Auth para login (email y contraseña)
+- Supabase Auth: clientes con Google o link por email; personal con email y contraseña
 - Vitest con pruebas contra un Postgres real
 
 ## Estructura
@@ -43,5 +43,15 @@ pnpm dev
 4. `pnpm admin:promote tu@email.com` para ser administrador de plataforma.
 5. En `/admin`, crear un comercio con el email del dueño (ya registrado).
 6. El dueño agrega sucursales, recompensas y empleados desde `/comercio`.
+
+## Login con Google
+
+1. Google Cloud Console → APIs y servicios → Credenciales → Crear ID de cliente OAuth (aplicación web).
+   En "URIs de redireccionamiento autorizados" va `https://<proyecto>.supabase.co/auth/v1/callback`.
+2. Supabase → Authentication → Sign In / Providers → Google: activar y pegar Client ID y Client Secret.
+3. Supabase → Authentication → URL Configuration → Redirect URLs: agregar `http://localhost:3000/**`,
+   la URL del túnel si se usa (`https://*.devtunnels.ms/**`) y la de producción.
+
+El QR del mostrador de cada comercio está en su panel (`/comercio/<id>`) y abre `/unirse/<slug>`.
 
 Cambios de esquema: editar `src/server/db/schema.ts` y correr `pnpm db:generate`.
