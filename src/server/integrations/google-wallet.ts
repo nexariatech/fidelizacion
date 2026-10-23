@@ -62,20 +62,22 @@ export function loyaltyObject(cfg: GoogleWalletConfig, card: WalletCard) {
     accountId: card.membershipId.slice(0, 8).toUpperCase(),
     loyaltyPoints: { label: "Puntos", balance: { int: card.balance } },
     barcode: { type: "QR_CODE", value: card.qrToken, alternateText: "Mostrar en caja" },
-    linksModuleData: {
-      uris: [{ uri: `${cfg.origin}/cliente/${card.merchantId}`, description: "Ver recompensas y canjear", id: "detalle" }],
-    },
+    // Google rechaza enlaces que no sean https (por ejemplo localhost).
+    ...(cfg.origin.startsWith("https://") && {
+      linksModuleData: {
+        uris: [{ uri: `${cfg.origin}/cliente/${card.merchantId}`, description: "Ver recompensas y canjear", id: "detalle" }],
+      },
+    }),
   };
 }
 
-// Enlace "Agregar a Google Wallet". El JWT incluye clase y objeto: Google los
-// crea al guardar si todavía no existen.
-export async function saveToWalletUrl(cfg: GoogleWalletConfig, card: WalletCard): Promise<string> {
+// Enlace "Agregar a Google Wallet". La clase y la tarjeta ya existen (ver
+// ensureWalletCard), así el JWT solo referencia la tarjeta por id.
+export async function saveToWalletUrl(cfg: GoogleWalletConfig, membershipId: string): Promise<string> {
   const key = await importPKCS8(cfg.privateKey, "RS256");
   const jwt = await new SignJWT({
     typ: "savetowallet",
-    origins: [cfg.origin],
-    payload: { loyaltyClasses: [loyaltyClass(cfg, card)], loyaltyObjects: [loyaltyObject(cfg, card)] },
+    payload: { loyaltyObjects: [{ id: objectId(cfg, membershipId) }] },
   })
     .setProtectedHeader({ alg: "RS256", typ: "JWT" })
     .setIssuer(cfg.serviceAccountEmail)
@@ -127,4 +129,39 @@ export async function patchWalletObject(
   if (res.status === 404) return false;
   if (!res.ok) throw new Error(`Google Wallet ${res.status}: ${await res.text()}`);
   return true;
+}
+
+export class GoogleWalletError extends Error {}
+
+async function walletRequest(cfg: GoogleWalletConfig, method: string, path: string, body?: unknown) {
+  const res = await fetch(`${API}/${path}`, {
+    method,
+    headers: { authorization: `Bearer ${await accessToken(cfg)}`, "content-type": "application/json" },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  if (res.status === 404 && method === "GET") return null;
+  if (!res.ok) {
+    const detail = await res.text();
+    let message = detail;
+    try {
+      message = (JSON.parse(detail) as { error?: { message?: string } }).error?.message ?? detail;
+    } catch {}
+    throw new GoogleWalletError(`Google Wallet rechazó ${method} ${path.split("/")[0]} (${res.status}): ${message}`);
+  }
+  return res.json();
+}
+
+// Crea la clase del comercio y la tarjeta del cliente si no existen, o
+// actualiza la tarjeta. Los errores de Google llegan con su mensaje real.
+export async function ensureWalletCard(cfg: GoogleWalletConfig, card: WalletCard) {
+  const cls = loyaltyClass(cfg, card);
+  if (!(await walletRequest(cfg, "GET", `loyaltyClass/${encodeURIComponent(cls.id)}`))) {
+    await walletRequest(cfg, "POST", "loyaltyClass", cls);
+  }
+  const obj = loyaltyObject(cfg, card);
+  if (await walletRequest(cfg, "GET", `loyaltyObject/${encodeURIComponent(obj.id)}`)) {
+    await walletRequest(cfg, "PUT", `loyaltyObject/${encodeURIComponent(obj.id)}`, obj);
+  } else {
+    await walletRequest(cfg, "POST", "loyaltyObject", obj);
+  }
 }

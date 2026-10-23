@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import type { DbOrTx } from "../db/client";
 import { customers, programMemberships } from "../db/schema";
-import { googleWalletConfig, patchWalletObject, saveToWalletUrl } from "../integrations/google-wallet";
+import { ensureWalletCard, googleWalletConfig, patchWalletObject, saveToWalletUrl } from "../integrations/google-wallet";
 import { customerMerchantDetail } from "./queries";
 
 function appOrigin() {
@@ -21,7 +21,7 @@ export async function googleWalletSaveUrl(db: DbOrTx, customerId: string, mercha
     .select({ fullName: customers.fullName, qrToken: customers.qrToken })
     .from(customers)
     .where(eq(customers.id, customerId));
-  return saveToWalletUrl(cfg, {
+  await ensureWalletCard(cfg, {
     merchantId,
     merchantName: detail.merchant.name,
     programName: detail.program.name,
@@ -30,6 +30,7 @@ export async function googleWalletSaveUrl(db: DbOrTx, customerId: string, mercha
     qrToken: customer.qrToken,
     balance: detail.balance,
   });
+  return saveToWalletUrl(cfg, detail.membershipId);
 }
 
 // Refleja el saldo en la tarjeta. Nunca hace fallar la operación de puntos:

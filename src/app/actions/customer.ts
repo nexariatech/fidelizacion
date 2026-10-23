@@ -7,6 +7,7 @@ import { requireViewer } from "@/server/auth/session";
 import { rotateQrToken } from "@/server/services/customers";
 import { requestRedemptionAuthorization } from "@/server/services/redemptions";
 import { googleWalletSaveUrl, syncWalletQrToken } from "@/server/services/wallet";
+import { GoogleWalletError } from "@/server/integrations/google-wallet";
 import { toActionError } from "@/lib/action-result";
 
 export type AuthorizationResult = { code: string; expiresAt: string } | { error: string };
@@ -34,6 +35,10 @@ export async function googleWalletAction(merchantId: string): Promise<{ url: str
     const url = await googleWalletSaveUrl(getDb(), viewer.customer.customerId, merchantId);
     return url ? { url } : { error: "Google Wallet no está configurado." };
   } catch (error) {
+    if (error instanceof GoogleWalletError) {
+      console.error(error);
+      return { error: error.message };
+    }
     return toActionError(error);
   }
 }
