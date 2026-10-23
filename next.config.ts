@@ -9,7 +9,9 @@ const isDev = process.env.NODE_ENV === "development";
 const nextConfig: NextConfig = {
   ...(isDev && {
     allowedDevOrigins: devTunnels,
-    experimental: { serverActions: { allowedOrigins: devTunnels } },
+    // VS Code reescribe el header Origin a localhost:3000 y deja el dominio
+    // real en x-forwarded-host; por eso también se permite localhost.
+    experimental: { serverActions: { allowedOrigins: [...devTunnels, "localhost:3000"] } },
   }),
 };
 
