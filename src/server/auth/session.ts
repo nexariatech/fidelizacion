@@ -24,7 +24,11 @@ export const getViewer = cache(async (): Promise<Viewer | null> => {
   if (!authUserId || !email) return null;
 
   const db = getDb();
-  let [customer, staff] = await Promise.all([loadCustomerContext(db, authUserId), loadStaffContext(db, authUserId)]);
+  const [existingCustomer, staff] = await Promise.all([
+    loadCustomerContext(db, authUserId),
+    loadStaffContext(db, authUserId),
+  ]);
+  let customer = existingCustomer;
   if (!customer) {
     const metadata = (claims.user_metadata ?? {}) as { full_name?: unknown };
     const fullName = String(metadata.full_name ?? "").trim() || email.split("@")[0];
