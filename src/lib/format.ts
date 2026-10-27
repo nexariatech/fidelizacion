@@ -23,4 +23,5 @@ export const movementLabels: Record<string, string> = {
   purchase_void: "Compra anulada",
   redemption: "Canje",
   redemption_cancel: "Canje cancelado",
+  profile_bonus: "Regalo por completar tus datos",
 };

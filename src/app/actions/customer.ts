@@ -5,10 +5,11 @@ import { after } from "next/server";
 import { getDb } from "@/server/db/client";
 import { requireViewer } from "@/server/auth/session";
 import { rotateQrToken } from "@/server/services/customers";
+import { completeCustomerProfile } from "@/server/services/enrollment";
 import { requestRedemptionAuthorization } from "@/server/services/redemptions";
-import { googleWalletSaveUrl, syncWalletQrToken } from "@/server/services/wallet";
+import { googleWalletSaveUrl, syncWalletCards, syncWalletQrToken } from "@/server/services/wallet";
 import { GoogleWalletError } from "@/server/integrations/google-wallet";
-import { toActionError } from "@/lib/action-result";
+import { toActionError, type ActionState } from "@/lib/action-result";
 
 export type AuthorizationResult = { code: string; expiresAt: string } | { error: string };
 
@@ -39,6 +40,21 @@ export async function googleWalletAction(merchantId: string): Promise<{ url: str
       console.error(error);
       return { error: error.message };
     }
+    return toActionError(error);
+  }
+}
+
+export async function completeProfileAction(_: ActionState, formData: FormData): Promise<ActionState> {
+  const viewer = await requireViewer();
+  try {
+    const memberships = await completeCustomerProfile(getDb(), viewer.customer, {
+      phone: String(formData.get("phone") ?? ""),
+      birthDate: String(formData.get("birthDate") ?? ""),
+    });
+    after(() => syncWalletCards(getDb(), viewer.customer.customerId));
+    revalidatePath("/cliente", "layout");
+    return { message: memberships.length ? "Listo. Ya sumaste tus puntos de regalo." : "Datos guardados." };
+  } catch (error) {
     return toActionError(error);
   }
 }

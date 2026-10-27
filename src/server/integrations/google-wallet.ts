@@ -36,6 +36,8 @@ export type WalletCard = {
   customerName: string;
   qrToken: string;
   balance: number;
+  // Mientras falten datos, la tarjeta muestra el aviso con los puntos de regalo.
+  pendingProfileBonus: number;
 };
 
 // Google descarga el logo, así que debe ser una URL pública (no localhost).
@@ -54,6 +56,11 @@ export function loyaltyClass(cfg: GoogleWalletConfig, card: Pick<WalletCard, "me
 }
 
 export function loyaltyObject(cfg: GoogleWalletConfig, card: WalletCard) {
+  const askProfile = card.pendingProfileBonus > 0;
+  const links = [
+    { uri: `${cfg.origin}/cliente/${card.merchantId}`, description: "Ver recompensas y canjear", id: "detalle" },
+    ...(askProfile ? [{ uri: `${cfg.origin}/cliente/perfil`, description: "Completar mis datos", id: "perfil" }] : []),
+  ];
   return {
     id: objectId(cfg, card.membershipId),
     classId: classId(cfg, card.merchantId),
@@ -62,12 +69,18 @@ export function loyaltyObject(cfg: GoogleWalletConfig, card: WalletCard) {
     accountId: card.membershipId.slice(0, 8).toUpperCase(),
     loyaltyPoints: { label: "Puntos", balance: { int: card.balance } },
     barcode: { type: "QR_CODE", value: card.qrToken, alternateText: "Mostrar en caja" },
+    // Lista vacía para que un PUT borre el aviso cuando ya completó los datos.
+    messages: askProfile
+      ? [
+          {
+            id: "completar-datos",
+            header: `Ganá ${card.pendingProfileBonus} puntos`,
+            body: "Completá tu teléfono y cumpleaños en la app y te regalamos los puntos.",
+          },
+        ]
+      : [],
     // Google rechaza enlaces que no sean https (por ejemplo localhost).
-    ...(cfg.origin.startsWith("https://") && {
-      linksModuleData: {
-        uris: [{ uri: `${cfg.origin}/cliente/${card.merchantId}`, description: "Ver recompensas y canjear", id: "detalle" }],
-      },
-    }),
+    ...(cfg.origin.startsWith("https://") && { linksModuleData: { uris: links } }),
   };
 }
 
@@ -149,6 +162,15 @@ async function walletRequest(cfg: GoogleWalletConfig, method: string, path: stri
     throw new GoogleWalletError(`Google Wallet rechazó ${method} ${path.split("/")[0]} (${res.status}): ${message}`);
   }
   return res.json();
+}
+
+// Reescribe la tarjeta solo si el cliente ya la tiene; no crea tarjetas nuevas.
+export async function updateWalletCardIfExists(cfg: GoogleWalletConfig, card: WalletCard) {
+  const obj = loyaltyObject(cfg, card);
+  const path = `loyaltyObject/${encodeURIComponent(obj.id)}`;
+  if (!(await walletRequest(cfg, "GET", path))) return false;
+  await walletRequest(cfg, "PUT", path, obj);
+  return true;
 }
 
 // Crea la clase del comercio y la tarjeta del cliente si no existen, o

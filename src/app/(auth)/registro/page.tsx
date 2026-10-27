@@ -4,12 +4,17 @@ import Link from "next/link";
 import { useActionState } from "react";
 import { signUp } from "@/app/actions/auth";
 import { Button, Card, Field, FormMessage, Input } from "@/components/ui";
+import { GoogleButton } from "../login/forms";
 
 export default function SignUpPage() {
   const [state, action, pending] = useActionState(signUp, null);
   return (
     <Card title="Crear cuenta">
       <p className="mb-4 text-sm text-neutral-600">Una sola cuenta para sumar puntos en todos los comercios.</p>
+      <div className="mb-5 space-y-3">
+        <GoogleButton next="/inicio" />
+        <p className="text-center text-xs text-neutral-500">o crea una cuenta con contraseña</p>
+      </div>
       <form action={action} className="space-y-4">
         <Field label="Nombre y apellido">
           <Input name="fullName" autoComplete="name" required minLength={2} />

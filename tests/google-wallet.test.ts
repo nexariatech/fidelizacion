@@ -2,6 +2,7 @@ import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { decodeJwt, exportPKCS8, generateKeyPair, jwtVerify, type CryptoKey } from "jose";
 import {
   ensureWalletCard,
+  loyaltyObject,
   objectId,
   patchWalletObject,
   saveToWalletUrl,
@@ -32,6 +33,7 @@ const card = {
   customerName: "Ana",
   qrToken: "token-opaco",
   balance: 42,
+  pendingProfileBonus: 0,
 };
 
 describe("Google Wallet", () => {
@@ -61,6 +63,16 @@ describe("Google Wallet", () => {
     expect((decodeJwt(jwt) as { payload: unknown }).payload).toEqual({
       loyaltyObjects: [{ id: objectId(cfg, card.membershipId) }],
     });
+  });
+
+  it("pide completar los datos con un aviso y un enlace mientras falten", () => {
+    const pending = loyaltyObject(cfg, { ...card, pendingProfileBonus: 50 });
+    expect(pending.messages).toEqual([expect.objectContaining({ id: "completar-datos", header: "Ganá 50 puntos" })]);
+    expect(pending.linksModuleData?.uris.map((u) => u.uri)).toContain("https://fidelizacion.example/cliente/perfil");
+
+    const done = loyaltyObject(cfg, card);
+    expect(done.messages).toEqual([]);
+    expect(done.linksModuleData?.uris.map((u) => u.id)).toEqual(["detalle"]);
   });
 
   it("muestra el motivo cuando Google rechaza la tarjeta", async () => {
