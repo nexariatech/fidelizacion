@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { getDb } from "@/server/db/client";
 import { requireStaff } from "@/server/auth/session";
 import { registerPurchase, voidPurchase } from "@/server/services/purchases";
@@ -12,6 +13,7 @@ import {
   setRewardActive,
   updateProgram,
 } from "@/server/services/management";
+import { syncWalletBalance } from "@/server/services/wallet";
 import { toActionError, type ActionState } from "@/lib/action-result";
 import { formatMoney, parseMoneyToCents } from "@/lib/format";
 
@@ -44,6 +46,7 @@ export async function registerPurchaseAction(_: ActionState, formData: FormData)
       idempotencyKey: text(formData, "idempotencyKey"),
     });
     revalidatePath(`/comercio/sucursal/${branchId}`);
+    after(() => syncWalletBalance(r.purchase.membershipId, r.balance));
     return {
       message: `Compra de ${formatMoney(r.purchase.amountCents)} registrada: +${r.purchase.pointsAwarded} pts. Saldo: ${r.balance} pts.`,
     };
@@ -58,6 +61,7 @@ export async function redeemAction(_: ActionState, formData: FormData): Promise<
     const branchId = text(formData, "branchId");
     const r = await redeemWithCode(getDb(), staff, { branchId, code: text(formData, "code") });
     revalidatePath(`/comercio/sucursal/${branchId}`);
+    after(() => syncWalletBalance(r.redemption.membershipId, r.balance));
     return { message: `Canje aprobado: entregar "${r.reward.name}" (−${r.reward.pointsCost} pts). Saldo: ${r.balance} pts.` };
   } catch (error) {
     return toActionError(error);
@@ -79,7 +83,11 @@ async function ownerAction(merchantId: string, run: () => Promise<string>): Prom
 export async function voidPurchaseAction(_: ActionState, formData: FormData): Promise<ActionState> {
   const { staff } = await requireStaff();
   return ownerAction(text(formData, "merchantId"), async () => {
-    await voidPurchase(getDb(), staff, { purchaseId: text(formData, "purchaseId"), reason: text(formData, "reason") });
+    const r = await voidPurchase(getDb(), staff, {
+      purchaseId: text(formData, "purchaseId"),
+      reason: text(formData, "reason"),
+    });
+    after(() => syncWalletBalance(r.purchase.membershipId, r.balance));
     return "Compra anulada.";
   });
 }
@@ -87,10 +95,11 @@ export async function voidPurchaseAction(_: ActionState, formData: FormData): Pr
 export async function cancelRedemptionAction(_: ActionState, formData: FormData): Promise<ActionState> {
   const { staff } = await requireStaff();
   return ownerAction(text(formData, "merchantId"), async () => {
-    await cancelRedemption(getDb(), staff, {
+    const r = await cancelRedemption(getDb(), staff, {
       redemptionId: text(formData, "redemptionId"),
       reason: text(formData, "reason"),
     });
+    after(() => syncWalletBalance(r.redemption.membershipId, r.balance));
     return "Canje cancelado y puntos devueltos.";
   });
 }
