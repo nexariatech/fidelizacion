@@ -1,6 +1,6 @@
 import "dotenv/config";
 import { randomUUID } from "node:crypto";
-import { sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
 import { createDb, type Db } from "@/server/db/client";
 import {
@@ -21,7 +21,11 @@ export async function setupTestDb() {
   const { db, sqlClient } = createDb(url);
   await db.execute(sql`drop schema if exists public cascade`);
   await db.execute(sql`drop schema if exists drizzle cascade`);
+  await db.execute(sql`drop schema if exists auth cascade`);
   await db.execute(sql`create schema public`);
+  // Réplica mínima de la tabla de usuarios de Supabase Auth.
+  await db.execute(sql`create schema auth`);
+  await db.execute(sql`create table auth.users (id uuid primary key, email text not null)`);
   await migrate(db, { migrationsFolder: "./drizzle" });
   return { db, close: () => sqlClient.end() };
 }
@@ -80,4 +84,16 @@ export async function createMerchant(db: Db, opts: { accrualBase?: "total" | "el
 
 export function key() {
   return randomUUID();
+}
+
+export async function createAuthUser(db: Db, email = `${randomUUID()}@test.local`) {
+  const id = randomUUID();
+  await db.execute(sql`insert into auth.users (id, email) values (${id}, ${email})`);
+  return { id, email };
+}
+
+export async function createPlatformAdmin(db: Db) {
+  const ctx = await createStaff(db, []);
+  await db.update(staffUsers).set({ isPlatformAdmin: true }).where(eq(staffUsers.id, ctx.staffUserId));
+  return { ...ctx, isPlatformAdmin: true };
 }
