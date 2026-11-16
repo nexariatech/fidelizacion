@@ -141,7 +141,7 @@ export async function registerCustomerAtCounter(db: Db, ctx: StaffContext, rawIn
       entityId: customer.id,
       data: { branchId: branch.id, withEmail: Boolean(input.email) },
     });
-    return customer;
+    return { ...customer, merchantId: branch.merchantId };
   });
 }
 

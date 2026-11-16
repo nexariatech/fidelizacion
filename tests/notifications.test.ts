@@ -1,7 +1,7 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import type { Db } from "@/server/db/client";
 import { registerCustomerAtCounter } from "@/server/services/customers";
-import { notifyPointsEarned } from "@/server/services/notifications";
+import { notifyCounterRegistration, notifyPointsEarned } from "@/server/services/notifications";
 import { registerPurchase } from "@/server/services/purchases";
 import { createMerchant, key, newDni, setupTestDb } from "./helpers";
 
@@ -51,5 +51,28 @@ describe("aviso al sumar puntos", () => {
 
     await notifyPointsEarned(db, r.purchase.id);
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("bienvenida al registrar en caja", () => {
+  it("envía el email con el link para crear la cuenta, solo si dio email", async () => {
+    vi.stubEnv("RESEND_API_KEY", "re_test");
+    vi.stubEnv("EMAIL_FROM", "avisos@example.com");
+    const fetchMock = vi.fn(async () => new Response("{}"));
+    vi.stubGlobal("fetch", fetchMock);
+    const m = await createMerchant(db);
+
+    const withEmail = await registerCustomerAtCounter(db, m.employeeA, {
+      branchId: m.branchA.id, dni: newDni(), fullName: "Laura Gómez", email: "laura@example.com", acceptPrivacy: true,
+    });
+    await notifyCounterRegistration(db, withEmail.id, withEmail.merchantId);
+    const body = JSON.parse(String((fetchMock.mock.calls[0] as unknown as [string, RequestInit])[1].body));
+    expect(body).toMatchObject({ to: "laura@example.com", subject: "Te sumaste al programa de puntos de Comercio" });
+    expect(body.text).toContain("Hola Laura:");
+    expect(body.text).toContain("/registro");
+
+    const noEmail = await registerCustomerAtCounter(db, m.employeeA, { branchId: m.branchA.id, dni: newDni(), fullName: "Sin Mail", acceptPrivacy: true });
+    await notifyCounterRegistration(db, noEmail.id, noEmail.merchantId);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });

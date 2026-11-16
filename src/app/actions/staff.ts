@@ -14,7 +14,7 @@ import {
   updateProgram,
 } from "@/server/services/management";
 import { syncWalletBalance } from "@/server/services/wallet";
-import { notifyPointsEarned } from "@/server/services/notifications";
+import { notifyCounterRegistration, notifyPointsEarned } from "@/server/services/notifications";
 import { registerCustomerAtCounter } from "@/server/services/customers";
 import { formatDni } from "@/server/domain/dni";
 import { toActionError, type ActionState } from "@/lib/action-result";
@@ -71,6 +71,7 @@ export async function registerCustomerAtCounterAction(_: ActionState, formData: 
       acceptPrivacy: formData.get("acceptPrivacy") === "on",
     });
     revalidatePath(`/comercio/sucursal/${branchId}`);
+    after(() => notifyCounterRegistration(getDb(), customer.id, customer.merchantId));
     return { message: `${customer.fullName} quedó registrado con DNI ${formatDni(customer.dni!)}. Ya puedes sumarle la compra.` };
   } catch (error) {
     return toActionError(error);

@@ -46,3 +46,26 @@ export async function notifyPointsEarned(db: DbOrTx, purchaseId: string) {
     if (result.status === "rejected") console.error("No se pudo avisar al cliente", result.reason);
   }
 }
+
+// Bienvenida al cliente que registraron en la caja, solo si dio un email: le
+// explica cómo crear su cuenta online (con ese email y su DNI) para ver sus
+// puntos, canjear y guardar la tarjeta en Google Wallet.
+export async function notifyCounterRegistration(db: DbOrTx, customerId: string, merchantId: string) {
+  const [row] = await db
+    .select({ email: customers.email, fullName: customers.fullName, hasAccount: customers.authUserId, merchantName: merchants.name })
+    .from(customers)
+    .innerJoin(merchants, eq(merchants.id, merchantId))
+    .where(eq(customers.id, customerId));
+  if (!row?.email || row.hasAccount) return;
+  const firstName = row.fullName.trim().split(/\s+/)[0];
+  await sendEmail({
+    to: row.email,
+    subject: `Te sumaste al programa de puntos de ${row.merchantName}`,
+    text: [
+      `Hola ${firstName}:`,
+      `Te registraron en el programa de puntos de ${row.merchantName}. Para sumar puntos, solo di tu DNI en la caja.`,
+      `Para ver tus puntos, canjear recompensas y guardar tu tarjeta en Google Wallet, crea tu cuenta en ${appOrigin()}/registro con este email y tu DNI.`,
+      `Si no te registraste vos, responde este email.`,
+    ].join("\n\n"),
+  }).catch((error) => console.error("No se pudo enviar la bienvenida", error));
+}

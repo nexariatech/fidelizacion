@@ -92,7 +92,7 @@ export function CounterSignUpForm({ branchId }: { branchId: string }) {
           <Input name="fullName" autoComplete="off" required minLength={2} />
         </Field>
       </div>
-      <Field label="Email (opcional)" hint="Le avisamos ahí cada vez que suma puntos">
+      <Field label="Email (opcional)" hint="Le mandamos la bienvenida y un aviso cada vez que suma puntos">
         <Input name="email" type="email" autoComplete="off" />
       </Field>
       <label className="flex items-start gap-2 text-sm text-neutral-700">
