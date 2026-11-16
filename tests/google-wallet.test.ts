@@ -3,6 +3,7 @@ import { decodeJwt, exportPKCS8, generateKeyPair, jwtVerify, type CryptoKey } fr
 import {
   ensureWalletCard,
   loyaltyObject,
+  notifyWalletCard,
   objectId,
   patchWalletObject,
   saveToWalletUrl,
@@ -31,13 +32,11 @@ const card = {
   programName: "Club Café",
   membershipId: "aa11bb22-3333-4444-5555-666677778888",
   customerName: "Ana",
-  qrToken: "token-opaco",
   balance: 42,
-  pendingProfileBonus: 0,
 };
 
 describe("Google Wallet", () => {
-  it("crea clase y tarjeta con QR y saldo, y el enlace solo referencia la tarjeta", async () => {
+  it("crea clase y tarjeta con saldo, y el enlace solo referencia la tarjeta", async () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(new Response(JSON.stringify({ access_token: "t", expires_in: 3600 })))
@@ -53,7 +52,6 @@ describe("Google Wallet", () => {
     expect(cls.id).toBe("3388000000012345678.merchant_6f1c2a8e11114c4c9a9a000000000001");
     expect(obj).toMatchObject({
       id: objectId(cfg, card.membershipId),
-      barcode: { type: "QR_CODE", value: "token-opaco" },
       loyaltyPoints: { balance: { int: 42 } },
     });
 
@@ -65,14 +63,27 @@ describe("Google Wallet", () => {
     });
   });
 
-  it("pide completar los datos con un aviso y un enlace mientras falten", () => {
-    const pending = loyaltyObject(cfg, { ...card, pendingProfileBonus: 50 });
-    expect(pending.messages).toEqual([expect.objectContaining({ id: "completar-datos", header: "Ganá 50 puntos" })]);
-    expect(pending.linksModuleData?.uris.map((u) => u.uri)).toContain("https://fidelizacion.example/cliente/perfil");
+  it("la tarjeta no tiene QR ni avisos de regalo, solo el enlace a la app", () => {
+    const obj = loyaltyObject(cfg, card);
+    expect(obj).not.toHaveProperty("barcode");
+    expect(obj.messages).toEqual([]);
+    expect(obj.linksModuleData?.uris.map((u) => u.id)).toEqual(["detalle"]);
+  });
 
-    const done = loyaltyObject(cfg, card);
-    expect(done.messages).toEqual([]);
-    expect(done.linksModuleData?.uris.map((u) => u.id)).toEqual(["detalle"]);
+  it("avisa en el teléfono al sumar puntos, solo si el cliente guardó la tarjeta", async () => {
+    const fetchMock = vi.fn(async (url: string) =>
+      url.includes("oauth2") ? new Response(JSON.stringify({ access_token: "t", expires_in: 3600 })) : new Response("{}"),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const message = { id: "compra-1", header: "+3 puntos", body: "Saldo: 45" };
+    expect(await notifyWalletCard(cfg, card.membershipId, message)).toBe(true);
+    const [, init] = fetchMock.mock.calls.find(([u]) => u.endsWith("/addMessage"))! as unknown as [string, RequestInit];
+    expect(JSON.parse(String(init.body))).toEqual({ message: { ...message, messageType: "TEXT_AND_NOTIFY" } });
+
+    vi.stubGlobal("fetch", vi.fn(async (url: string) =>
+      url.includes("oauth2") ? new Response(JSON.stringify({ access_token: "t", expires_in: 3600 })) : new Response("", { status: 404 }),
+    ));
+    expect(await notifyWalletCard(cfg, card.membershipId, message)).toBe(false);
   });
 
   it("muestra el motivo cuando Google rechaza la tarjeta", async () => {

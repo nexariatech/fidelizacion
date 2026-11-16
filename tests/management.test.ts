@@ -125,7 +125,7 @@ describe("gestión del dueño", () => {
     const { customer, ctx } = await createCustomer(db);
     await registerPurchase(db, m.employeeA, {
       branchId: m.branchA.id,
-      qrToken: customer.qrToken,
+      dni: customer.dni!,
       amountCents: 30_000,
       idempotencyKey: key(),
     });
@@ -140,7 +140,7 @@ describe("consultas", () => {
     const a = await createMerchantFixture(db);
     const b = await createMerchantFixture(db);
     const { customer, ctx } = await createCustomer(db);
-    await registerPurchase(db, a.owner, { branchId: a.branchA.id, qrToken: customer.qrToken, amountCents: 50_000, idempotencyKey: key() });
+    await registerPurchase(db, a.owner, { branchId: a.branchA.id, dni: customer.dni!, amountCents: 50_000, idempotencyKey: key() });
 
     const overview = await customerOverview(db, ctx.customerId);
     expect(overview.memberships).toHaveLength(1);
@@ -154,7 +154,7 @@ describe("consultas", () => {
     const c1 = await createCustomer(db);
     const c2 = await createCustomer(db);
     for (const c of [c1, c1, c2]) {
-      await registerPurchase(db, m.owner, { branchId: m.branchA.id, qrToken: c.customer.qrToken, amountCents: 20_000, idempotencyKey: key() });
+      await registerPurchase(db, m.owner, { branchId: m.branchA.id, dni: c.customer.dni!, amountCents: 20_000, idempotencyKey: key() });
     }
     const dash = await ownerDashboard(db, m.owner, m.merchant.id);
     expect(dash.stats).toEqual({ customers: 2, purchases: 3, pointsAwarded: 6, redemptions: 0 });

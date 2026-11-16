@@ -24,8 +24,7 @@ export async function customerOverview(db: DbOrTx, customerId: string) {
   const [customer] = await db
     .select({
       fullName: customers.fullName,
-      qrToken: customers.qrToken,
-      profileComplete: customers.profileCompletedAt,
+      dni: customers.dni,
     })
     .from(customers)
     .where(eq(customers.id, customerId));
@@ -49,9 +48,9 @@ export async function customerProfile(db: DbOrTx, customerId: string) {
     .select({
       fullName: customers.fullName,
       email: customers.email,
+      dni: customers.dni,
       phone: customers.phone,
       birthDate: customers.birthDate,
-      profileCompletedAt: customers.profileCompletedAt,
     })
     .from(customers)
     .where(eq(customers.id, customerId));
@@ -65,10 +64,8 @@ export async function customerMerchantDetail(db: DbOrTx, customerId: string, mer
       membership: programMemberships,
       merchant: merchants,
       program: loyaltyPrograms,
-      profileCompletedAt: customers.profileCompletedAt,
     })
     .from(programMemberships)
-    .innerJoin(customers, eq(customers.id, programMemberships.customerId))
     .innerJoin(merchants, eq(merchants.id, programMemberships.merchantId))
     .innerJoin(loyaltyPrograms, eq(loyaltyPrograms.id, programMemberships.programId))
     .where(and(eq(programMemberships.customerId, customerId), eq(programMemberships.merchantId, merchantId)));
@@ -93,9 +90,13 @@ export async function customerMerchantDetail(db: DbOrTx, customerId: string, mer
         balanceAfter: pointMovements.balanceAfter,
         branchName: branches.name,
         createdAt: pointMovements.createdAt,
+        purchaseId: pointMovements.purchaseId,
+        disputedAt: purchases.disputedAt,
+        purchaseStatus: purchases.status,
       })
       .from(pointMovements)
       .leftJoin(branches, eq(branches.id, pointMovements.branchId))
+      .leftJoin(purchases, eq(purchases.id, pointMovements.purchaseId))
       .where(eq(pointMovements.membershipId, row.membership.id))
       .orderBy(desc(pointMovements.createdAt))
       .limit(30),
@@ -103,10 +104,8 @@ export async function customerMerchantDetail(db: DbOrTx, customerId: string, mer
 
   return {
     merchant: { id: row.merchant.id, name: row.merchant.name, status: row.merchant.status },
-    program: { name: row.program.name, active: row.program.active, profileBonusPoints: row.program.profileBonusPoints },
+    program: { name: row.program.name, active: row.program.active },
     membershipId: row.membership.id,
-    profileBonusGranted: row.membership.profileBonusGrantedAt !== null,
-    profileComplete: row.profileCompletedAt !== null,
     balance: row.membership.balance,
     rewards: rewardList,
     branches: branchList,
@@ -220,6 +219,7 @@ export async function ownerDashboard(db: DbOrTx, ctx: StaffContext, merchantId: 
           points: purchases.pointsAwarded,
           status: purchases.status,
           voidReason: purchases.voidReason,
+          disputedAt: purchases.disputedAt,
           createdAt: purchases.createdAt,
         })
         .from(purchases)

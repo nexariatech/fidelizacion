@@ -15,6 +15,20 @@
       "when": 1792734106846,
       "tag": "0001_registro_google",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1794852546322,
+      "tag": "0002_dni_caja_avisos",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1794852547199,
+      "tag": "0003_quitar_bono_y_qr",
+      "breakpoints": true
     }
   ]
 }

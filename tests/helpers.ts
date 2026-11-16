@@ -13,7 +13,6 @@ import {
   staffUsers,
 } from "@/server/db/schema";
 import { loadStaffContext, type CustomerContext, type StaffContext } from "@/server/auth/context";
-import { newQrToken } from "@/server/services/customers";
 
 export async function setupTestDb() {
   const url = process.env.TEST_DATABASE_URL;
@@ -42,11 +41,17 @@ export async function createStaff(db: Db, assignments: { merchantId: string; bra
   return (await loadStaffContext(db, authUserId)) as StaffContext;
 }
 
+// DNIs únicos y válidos dentro de una corrida.
+let nextDni = 10_000_000 + Math.floor(Math.random() * 1_000_000) * 50;
+export function newDni() {
+  return String(nextDni++);
+}
+
 export async function createCustomer(db: Db) {
   const authUserId = randomUUID();
   const [customer] = await db
     .insert(customers)
-    .values({ authUserId, fullName: "Cliente", email: `${authUserId}@test.local`, qrToken: newQrToken() })
+    .values({ authUserId, fullName: "Cliente Prueba", email: `${authUserId}@test.local`, dni: newDni() })
     .returning();
   const ctx: CustomerContext = { kind: "customer", customerId: customer.id };
   return { customer, ctx };

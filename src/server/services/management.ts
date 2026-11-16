@@ -1,7 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import type { Db, Tx } from "../db/client";
-import { branches, loyaltyPrograms, merchants, rewards, staffAssignments, staffUsers } from "../db/schema";
+import { branches, customers, loyaltyPrograms, merchants, rewards, staffAssignments, staffUsers } from "../db/schema";
 import { requireOwner, type StaffContext } from "../auth/context";
 import { findAuthUserIdByEmail } from "../auth/identity";
 import { DomainError } from "../domain/errors";
@@ -14,12 +14,19 @@ const ruleFields = {
   unitAmountCents: z.number().int().positive(),
 };
 
-// La persona debe haberse registrado antes; así no hace falta la clave de
-// servicio de Supabase para crear cuentas.
+// La persona debe haberse registrado antes como personal (/registro/comercio);
+// así no hace falta la clave de servicio de Supabase para crear cuentas. Una
+// cuenta de cliente no se convierte en personal.
 async function ensureStaffUser(tx: Tx, email: string) {
   const normalized = email.trim().toLowerCase();
   const authUserId = await findAuthUserIdByEmail(tx, normalized);
-  if (!authUserId) throw new DomainError("not_found", "No existe una cuenta con ese email. Debe registrarse primero.");
+  if (!authUserId) {
+    throw new DomainError("not_found", "No existe una cuenta con ese email. Debe registrarse primero como personal de comercio.");
+  }
+  const [customer] = await tx.select({ id: customers.id }).from(customers).where(eq(customers.authUserId, authUserId));
+  if (customer) {
+    throw new DomainError("account_type_conflict", "Ese email es de una cuenta de cliente. El empleado debe registrarse como personal con otro email.");
+  }
   await tx
     .insert(staffUsers)
     .values({ authUserId, email: normalized, fullName: normalized.split("@")[0] })
@@ -78,7 +85,6 @@ const updateProgramInput = z.object({
   merchantId: z.uuid(),
   name: z.string().trim().min(2).max(120),
   active: z.boolean(),
-  profileBonusPoints: z.number().int().min(0).max(100_000).optional(),
   ...ruleFields,
 });
 

@@ -14,6 +14,9 @@ import {
   updateProgram,
 } from "@/server/services/management";
 import { syncWalletBalance } from "@/server/services/wallet";
+import { notifyCounterRegistration, notifyPointsEarned } from "@/server/services/notifications";
+import { registerCustomerAtCounter } from "@/server/services/customers";
+import { formatDni } from "@/server/domain/dni";
 import { toActionError, type ActionState } from "@/lib/action-result";
 import { formatMoney, parseMoneyToCents } from "@/lib/format";
 
@@ -39,7 +42,7 @@ export async function registerPurchaseAction(_: ActionState, formData: FormData)
     const branchId = text(formData, "branchId");
     const r = await registerPurchase(getDb(), staff, {
       branchId,
-      qrToken: text(formData, "qrToken"),
+      dni: text(formData, "dni"),
       amountCents,
       eligibleAmountCents,
       externalReference: text(formData, "reference") || null,
@@ -47,9 +50,29 @@ export async function registerPurchaseAction(_: ActionState, formData: FormData)
     });
     revalidatePath(`/comercio/sucursal/${branchId}`);
     after(() => syncWalletBalance(r.purchase.membershipId, r.balance));
+    if (!r.replayed) after(() => notifyPointsEarned(getDb(), r.purchase.id));
     return {
-      message: `Compra de ${formatMoney(r.purchase.amountCents)} registrada: +${r.purchase.pointsAwarded} pts. Saldo: ${r.balance} pts.`,
+      message: `Compra de ${formatMoney(r.purchase.amountCents)} para ${r.customerName}: +${r.purchase.pointsAwarded} pts. Saldo: ${r.balance} pts.`,
     };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+
+export async function registerCustomerAtCounterAction(_: ActionState, formData: FormData): Promise<ActionState> {
+  const { staff } = await requireStaff();
+  try {
+    const branchId = text(formData, "branchId");
+    const customer = await registerCustomerAtCounter(getDb(), staff, {
+      branchId,
+      dni: text(formData, "dni"),
+      fullName: text(formData, "fullName"),
+      email: text(formData, "email"),
+      acceptPrivacy: formData.get("acceptPrivacy") === "on",
+    });
+    revalidatePath(`/comercio/sucursal/${branchId}`);
+    after(() => notifyCounterRegistration(getDb(), customer.id, customer.merchantId));
+    return { message: `${customer.fullName} quedó registrado con DNI ${formatDni(customer.dni!)}. Ya puedes sumarle la compra.` };
   } catch (error) {
     return toActionError(error);
   }
@@ -117,7 +140,6 @@ export async function updateProgramAction(_: ActionState, formData: FormData): P
       accrualBase: text(formData, "accrualBase") === "eligible" ? "eligible" : "total",
       pointsPerUnit: int(formData, "pointsPerUnit"),
       unitAmountCents,
-      profileBonusPoints: int(formData, "profileBonusPoints"),
     });
     return "Programa actualizado.";
   });

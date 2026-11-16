@@ -3,7 +3,7 @@ import { signOut } from "@/app/actions/auth";
 import type { Viewer } from "@/server/auth/session";
 
 export function AppHeader({ viewer }: { viewer: Viewer }) {
-  const isStaff = (viewer.staff?.assignments.length ?? 0) > 0;
+  const isStaff = viewer.staff !== null;
   return (
     <header className="border-b border-neutral-200 bg-white">
       <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-4 py-3">
@@ -11,12 +11,16 @@ export function AppHeader({ viewer }: { viewer: Viewer }) {
           Fidelización
         </Link>
         <nav className="flex flex-wrap items-center gap-4 text-sm">
-          <Link href="/cliente" className="text-neutral-700 hover:text-indigo-700">
-            Mis puntos
-          </Link>
-          <Link href="/cliente/perfil" className="text-neutral-700 hover:text-indigo-700">
-            Mis datos
-          </Link>
+          {!isStaff && (
+            <>
+              <Link href="/cliente" className="text-neutral-700 hover:text-indigo-700">
+                Mis puntos
+              </Link>
+              <Link href="/cliente/perfil" className="text-neutral-700 hover:text-indigo-700">
+                Mis datos
+              </Link>
+            </>
+          )}
           {isStaff && (
             <Link href="/comercio" className="text-neutral-700 hover:text-indigo-700">
               Comercio

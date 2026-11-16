@@ -51,7 +51,7 @@ export default async function OwnerPage({ params }: { params: Promise<{ merchant
         <div className="flex flex-wrap items-center gap-6">
           <div className="w-44 shrink-0" dangerouslySetInnerHTML={{ __html: joinQrSvg }} />
           <div className="min-w-0 space-y-2 text-sm text-neutral-600">
-            <p>Imprímelo y déjalo a la vista. El cliente lo escanea, entra con Google y queda registrado en tu programa.</p>
+            <p>Imprímelo y déjalo a la vista. El cliente lo escanea, entra con Google, carga su DNI una sola vez y queda registrado en tu programa. Para sumar puntos después, solo te dice su DNI.</p>
             <code className="block break-all select-all rounded bg-neutral-100 p-2 text-xs">{joinUrl}</code>
           </div>
         </div>
@@ -77,9 +77,6 @@ export default async function OwnerPage({ params }: { params: Promise<{ merchant
                 <option value="total">Importe total de la compra</option>
                 <option value="eligible">Importe elegible que informa el empleado</option>
               </Select>
-            </Field>
-            <Field label="Regalo por completar datos (pts)" hint="Se acredita una vez por cliente. 0 lo desactiva.">
-              <Input name="profileBonusPoints" type="number" min={0} defaultValue={d.program.profileBonusPoints} required />
             </Field>
             <label className="flex items-center gap-2 text-sm">
               <input type="checkbox" name="active" defaultChecked={d.program.active} /> Programa activo
@@ -160,6 +157,11 @@ export default async function OwnerPage({ params }: { params: Promise<{ merchant
                 <span>
                   {formatDate(p.createdAt)} · {p.branchName} · {p.customerName} · {formatMoney(p.amountCents)} · +
                   {p.points} pts
+                  {p.disputedAt && p.status !== "voided" && (
+                    <span className="ml-2">
+                      <Badge tone="amber">el cliente no la reconoce</Badge>
+                    </span>
+                  )}
                 </span>
                 {p.status === "voided" ? (
                   <Badge tone="red">anulada: {p.voidReason}</Badge>

@@ -34,10 +34,7 @@ export type WalletCard = {
   programName: string;
   membershipId: string;
   customerName: string;
-  qrToken: string;
   balance: number;
-  // Mientras falten datos, la tarjeta muestra el aviso con los puntos de regalo.
-  pendingProfileBonus: number;
 };
 
 // Google descarga el logo, así que debe ser una URL pública (no localhost).
@@ -55,12 +52,10 @@ export function loyaltyClass(cfg: GoogleWalletConfig, card: Pick<WalletCard, "me
   };
 }
 
+// Sin código de barras: los puntos se suman con el DNI y el canje usa un código
+// temporal que se genera en la app. Un PUT con messages vacío borra avisos viejos.
 export function loyaltyObject(cfg: GoogleWalletConfig, card: WalletCard) {
-  const askProfile = card.pendingProfileBonus > 0;
-  const links = [
-    { uri: `${cfg.origin}/cliente/${card.merchantId}`, description: "Ver recompensas y canjear", id: "detalle" },
-    ...(askProfile ? [{ uri: `${cfg.origin}/cliente/perfil`, description: "Completar mis datos", id: "perfil" }] : []),
-  ];
+  const links = [{ uri: `${cfg.origin}/cliente/${card.merchantId}`, description: "Ver recompensas y canjear", id: "detalle" }];
   return {
     id: objectId(cfg, card.membershipId),
     classId: classId(cfg, card.merchantId),
@@ -68,17 +63,7 @@ export function loyaltyObject(cfg: GoogleWalletConfig, card: WalletCard) {
     accountName: card.customerName,
     accountId: card.membershipId.slice(0, 8).toUpperCase(),
     loyaltyPoints: { label: "Puntos", balance: { int: card.balance } },
-    barcode: { type: "QR_CODE", value: card.qrToken, alternateText: "Mostrar en caja" },
-    // Lista vacía para que un PUT borre el aviso cuando ya completó los datos.
-    messages: askProfile
-      ? [
-          {
-            id: "completar-datos",
-            header: `Ganá ${card.pendingProfileBonus} puntos`,
-            body: "Completá tu teléfono y cumpleaños en la app y te regalamos los puntos.",
-          },
-        ]
-      : [],
+    messages: [],
     // Google rechaza enlaces que no sean https (por ejemplo localhost).
     ...(cfg.origin.startsWith("https://") && { linksModuleData: { uris: links } }),
   };
@@ -129,11 +114,10 @@ async function accessToken(cfg: GoogleWalletConfig): Promise<string> {
 export async function patchWalletObject(
   cfg: GoogleWalletConfig,
   membershipId: string,
-  patch: { balance?: number; qrToken?: string },
+  patch: { balance?: number },
 ) {
   const body: Record<string, unknown> = {};
   if (patch.balance !== undefined) body.loyaltyPoints = { label: "Puntos", balance: { int: patch.balance } };
-  if (patch.qrToken !== undefined) body.barcode = { type: "QR_CODE", value: patch.qrToken, alternateText: "Mostrar en caja" };
   const res = await fetch(`${API}/loyaltyObject/${encodeURIComponent(objectId(cfg, membershipId))}`, {
     method: "PATCH",
     headers: { authorization: `Bearer ${await accessToken(cfg)}`, "content-type": "application/json" },
@@ -186,4 +170,14 @@ export async function ensureWalletCard(cfg: GoogleWalletConfig, card: WalletCard
   } else {
     await walletRequest(cfg, "POST", "loyaltyObject", obj);
   }
+}
+
+// Mensaje en la tarjeta con notificación en el teléfono (TEXT_AND_NOTIFY).
+// Google limita las notificaciones por tarjeta y por día; pasado el límite el
+// mensaje queda en la tarjeta sin sonar. Devuelve false si el cliente no la guardó.
+export async function notifyWalletCard(cfg: GoogleWalletConfig, membershipId: string, message: { id: string; header: string; body: string }) {
+  const path = `loyaltyObject/${encodeURIComponent(objectId(cfg, membershipId))}`;
+  if (!(await walletRequest(cfg, "GET", path))) return false;
+  await walletRequest(cfg, "POST", `${path}/addMessage`, { message: { ...message, messageType: "TEXT_AND_NOTIFY" } });
+  return true;
 }

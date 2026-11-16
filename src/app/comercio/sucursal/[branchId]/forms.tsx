@@ -1,13 +1,13 @@
 "use client";
 
 import { useActionState, useEffect, useRef, useState } from "react";
-import { redeemAction, registerPurchaseAction } from "@/app/actions/staff";
+import { redeemAction, registerCustomerAtCounterAction, registerPurchaseAction } from "@/app/actions/staff";
+import { ActionForm } from "@/components/action-form";
 import { QrScannerButton } from "@/components/qr-scanner";
 import { Button, Field, FormMessage, Input } from "@/components/ui";
 
 export function PurchaseForm({ branchId, askEligible }: { branchId: string; askEligible: boolean }) {
   const [state, action, pending] = useActionState(registerPurchaseAction, null);
-  const [qrToken, setQrToken] = useState("");
   // Una clave por compra: si la red falla y se reenvía, no se duplica.
   const [idempotencyKey, setIdempotencyKey] = useState(() => crypto.randomUUID());
   const formRef = useRef<HTMLFormElement>(null);
@@ -15,7 +15,6 @@ export function PurchaseForm({ branchId, askEligible }: { branchId: string; askE
   useEffect(() => {
     if (state?.message) {
       formRef.current?.reset();
-      setQrToken("");
       setIdempotencyKey(crypto.randomUUID());
     }
   }, [state]);
@@ -24,17 +23,8 @@ export function PurchaseForm({ branchId, askEligible }: { branchId: string; askE
     <form ref={formRef} action={action} className="space-y-4">
       <input type="hidden" name="branchId" value={branchId} />
       <input type="hidden" name="idempotencyKey" value={idempotencyKey} />
-      <Field label="QR del cliente">
-        <div className="space-y-2">
-          <QrScannerButton onResult={setQrToken} label="Escanear QR del cliente" />
-          <Input
-            name="qrToken"
-            value={qrToken}
-            onChange={(e) => setQrToken(e.target.value)}
-            placeholder="o pega el código del QR"
-            required
-          />
-        </div>
+      <Field label="DNI del cliente" hint="Confirma con el cliente el nombre que aparece al registrar">
+        <Input name="dni" inputMode="numeric" autoComplete="off" placeholder="30123456" required pattern="[0-9.\s]{7,10}" />
       </Field>
       <Field label="Importe total">
         <Input name="amount" inputMode="decimal" placeholder="0,00" required />
@@ -86,5 +76,35 @@ export function RedeemForm({ branchId }: { branchId: string }) {
         {pending ? "Validando…" : "Validar y canjear"}
       </Button>
     </form>
+  );
+}
+
+// Alta del cliente en la caja, antes de sumarle la primera compra.
+export function CounterSignUpForm({ branchId }: { branchId: string }) {
+  return (
+    <ActionForm action={registerCustomerAtCounterAction} submitLabel="Registrar cliente" variant="secondary" className="space-y-4">
+      <input type="hidden" name="branchId" value={branchId} />
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field label="DNI">
+          <Input name="dni" inputMode="numeric" autoComplete="off" placeholder="30123456" required pattern="[0-9.\s]{7,10}" />
+        </Field>
+        <Field label="Nombre y apellido">
+          <Input name="fullName" autoComplete="off" required minLength={2} />
+        </Field>
+      </div>
+      <Field label="Email (opcional)" hint="Le mandamos la bienvenida y un aviso cada vez que suma puntos">
+        <Input name="email" type="email" autoComplete="off" />
+      </Field>
+      <label className="flex items-start gap-2 text-sm text-neutral-700">
+        <input type="checkbox" name="acceptPrivacy" required className="mt-1" />
+        <span>
+          El cliente aceptó la{" "}
+          <a href="/privacidad" target="_blank" className="font-medium text-indigo-700 underline">
+            política de privacidad
+          </a>{" "}
+          y que usemos su DNI para registrar sus puntos.
+        </span>
+      </label>
+    </ActionForm>
   );
 }

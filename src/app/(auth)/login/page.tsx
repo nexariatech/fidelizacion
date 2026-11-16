@@ -29,15 +29,18 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
         )}
         <GoogleButton next={next} />
         <MagicLinkForm next={next} />
+        <p className="text-center text-sm text-neutral-600">
+          ¿Primera vez? Entra con Google o con el link y te pedimos tu DNI.
+        </p>
         <details className="text-sm text-neutral-600">
-          <summary className="cursor-pointer">Ingresar con contraseña (personal de comercios)</summary>
+          <summary className="cursor-pointer">Personal de comercios: ingresar con contraseña</summary>
           <div className="mt-4">
             <PasswordForm next={next} />
           </div>
           <p className="mt-4 text-center">
-            ¿No tienes cuenta?{" "}
-            <Link href="/registro" className="font-medium text-indigo-700">
-              Regístrate
+            ¿Tienes un comercio?{" "}
+            <Link href="/registro/comercio" className="font-medium text-indigo-700">
+              Regístralo
             </Link>
           </p>
         </details>
