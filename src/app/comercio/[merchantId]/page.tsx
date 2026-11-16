@@ -78,9 +78,6 @@ export default async function OwnerPage({ params }: { params: Promise<{ merchant
                 <option value="eligible">Importe elegible que informa el empleado</option>
               </Select>
             </Field>
-            <Field label="Regalo por completar datos (pts)" hint="Se acredita una vez por cliente. 0 lo desactiva.">
-              <Input name="profileBonusPoints" type="number" min={0} defaultValue={d.program.profileBonusPoints} required />
-            </Field>
             <label className="flex items-center gap-2 text-sm">
               <input type="checkbox" name="active" defaultChecked={d.program.active} /> Programa activo
             </label>
@@ -160,6 +157,11 @@ export default async function OwnerPage({ params }: { params: Promise<{ merchant
                 <span>
                   {formatDate(p.createdAt)} · {p.branchName} · {p.customerName} · {formatMoney(p.amountCents)} · +
                   {p.points} pts
+                  {p.disputedAt && p.status !== "voided" && (
+                    <span className="ml-2">
+                      <Badge tone="amber">el cliente no la reconoce</Badge>
+                    </span>
+                  )}
                 </span>
                 {p.status === "voided" ? (
                   <Badge tone="red">anulada: {p.voidReason}</Badge>

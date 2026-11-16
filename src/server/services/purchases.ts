@@ -45,7 +45,7 @@ export async function registerPurchase(db: Db, ctx: StaffContext, rawInput: Regi
       .from(customers)
       .where(eq(customers.dni, input.dni));
     if (!customer) {
-      throw new DomainError("not_found", "No hay ningún cliente con ese DNI. Pedile que se registre escaneando el QR del mostrador.");
+      throw new DomainError("not_found", "Ese DNI no está registrado. Regístralo primero en \"Cliente nuevo\" y después suma la compra.");
     }
     const customerName = maskName(customer.fullName);
 

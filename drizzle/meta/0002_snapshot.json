@@ -1,5 +1,5 @@
 {
-  "id": "700a356d-1ae7-49cf-94ff-7ee2da3c9865",
+  "id": "11fed411-b483-4a55-92eb-4b2f3431f374",
   "prevId": "31d7b9a0-bd4b-479d-b509-1dace9c0c823",
   "version": "7",
   "dialect": "postgresql",
@@ -206,7 +206,7 @@
           "name": "auth_user_id",
           "type": "uuid",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "full_name": {
           "name": "full_name",
@@ -218,17 +218,11 @@
           "name": "email",
           "type": "text",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "dni": {
           "name": "dni",
           "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "privacy_accepted_at": {
-          "name": "privacy_accepted_at",
-          "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
         },
@@ -244,6 +238,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "privacy_accepted_at": {
+          "name": "privacy_accepted_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
         "profile_completed_at": {
           "name": "profile_completed_at",
           "type": "timestamp with time zone",
@@ -256,6 +256,12 @@
           "primaryKey": false,
           "notNull": true
         },
+        "registered_by_staff_id": {
+          "name": "registered_by_staff_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -265,7 +271,21 @@
         }
       },
       "indexes": {},
-      "foreignKeys": {},
+      "foreignKeys": {
+        "customers_registered_by_staff_id_staff_users_id_fk": {
+          "name": "customers_registered_by_staff_id_staff_users_id_fk",
+          "tableFrom": "customers",
+          "tableTo": "staff_users",
+          "columnsFrom": [
+            "registered_by_staff_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "customers_auth_user_id_unique": {
@@ -302,6 +322,10 @@
         "customers_dni_format": {
           "name": "customers_dni_format",
           "value": "\"customers\".\"dni\" is null or \"customers\".\"dni\" ~ '^[0-9]{7,8}$'"
+        },
+        "customers_identity": {
+          "name": "customers_identity",
+          "value": "\"customers\".\"auth_user_id\" is not null or \"customers\".\"dni\" is not null"
         }
       },
       "isRLSEnabled": false
@@ -902,6 +926,12 @@
         },
         "voided_at": {
           "name": "voided_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "disputed_at": {
+          "name": "disputed_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false

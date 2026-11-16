@@ -3,7 +3,6 @@ import { Card, Empty } from "@/components/ui";
 import { requireCustomer } from "@/server/auth/session";
 import { getDb } from "@/server/db/client";
 import { customerOverview } from "@/server/services/queries";
-import { ProfileBanner } from "./profile-banner";
 import { formatDni } from "@/server/domain/dni";
 
 export default async function CustomerHome({ searchParams }: { searchParams: Promise<{ comercio?: string }> }) {
@@ -18,7 +17,6 @@ export default async function CustomerHome({ searchParams }: { searchParams: Pro
           Ese comercio no existe o su programa está pausado.
         </p>
       )}
-      {!customer.profileComplete && <ProfileBanner />}
       <div className="grid gap-6 md:grid-cols-[300px_1fr]">
         <Card title="Para sumar puntos">
           <div className="space-y-3 text-center">

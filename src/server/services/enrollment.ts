@@ -1,17 +1,16 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import type { Db, DbOrTx } from "../db/client";
-import { customers, loyaltyPrograms, merchants, programMemberships } from "../db/schema";
+import { customers, loyaltyPrograms, merchants } from "../db/schema";
 import type { CustomerContext } from "../auth/context";
 import { DomainError } from "../domain/errors";
 import { parse } from "../domain/validation";
-import { audit } from "./audit";
-import { ensureMembership, grantProfileBonus, lockMembership } from "./memberships";
+import { ensureMembership } from "./memberships";
 
 // Comercio activo con programa activo, para la página de alta por QR.
 export async function findJoinableMerchant(db: DbOrTx, slug: string) {
   const [row] = await db
-    .select({ id: merchants.id, name: merchants.name, programName: loyaltyPrograms.name, bonus: loyaltyPrograms.profileBonusPoints })
+    .select({ id: merchants.id, name: merchants.name, programName: loyaltyPrograms.name })
     .from(merchants)
     .innerJoin(loyaltyPrograms, eq(loyaltyPrograms.merchantId, merchants.id))
     .where(and(eq(merchants.slug, slug), eq(merchants.status, "active"), eq(loyaltyPrograms.active, true)));
@@ -33,7 +32,7 @@ export async function joinMerchant(db: Db, ctx: CustomerContext, slug: string) {
   });
 }
 
-const profileInput = z.object({
+const contactInput = z.object({
   phone: z
     .string()
     .trim()
@@ -44,42 +43,8 @@ const profileInput = z.object({
   }, "Fecha inválida"),
 });
 
-// Guarda teléfono y cumpleaños. La primera vez acredita el regalo en cada
-// comercio donde el cliente ya es miembro.
-export async function completeCustomerProfile(db: Db, ctx: CustomerContext, rawInput: z.input<typeof profileInput>) {
-  const input = parse(profileInput, rawInput);
-  return db.transaction(async (tx) => {
-    const [before] = await tx
-      .select({ profileCompletedAt: customers.profileCompletedAt })
-      .from(customers)
-      .where(eq(customers.id, ctx.customerId))
-      .for("update");
-    await tx
-      .update(customers)
-      .set({ phone: input.phone, birthDate: input.birthDate, profileCompletedAt: before.profileCompletedAt ?? new Date() })
-      .where(eq(customers.id, ctx.customerId));
-
-    const memberships = await tx
-      .select({ programId: programMemberships.programId })
-      .from(programMemberships)
-      .where(eq(programMemberships.customerId, ctx.customerId));
-    const programs = memberships.length
-      ? await tx.select().from(loyaltyPrograms).where(inArray(loyaltyPrograms.id, memberships.map((m) => m.programId))).orderBy(loyaltyPrograms.id)
-      : [];
-
-    const updated = [];
-    for (const program of programs) {
-      const membership = await lockMembership(tx, program.id, ctx.customerId);
-      updated.push(await grantProfileBonus(tx, program, membership));
-    }
-    await audit(tx, {
-      merchantId: null,
-      actorType: "customer",
-      actorId: ctx.customerId,
-      action: "customer.profile_completed",
-      entityType: "customer",
-      entityId: ctx.customerId,
-    });
-    return updated.map((m) => ({ membershipId: m.id, balance: m.balance }));
-  });
+// Teléfono y cumpleaños, opcionales. Ya no regalan puntos.
+export async function updateCustomerContact(db: Db, ctx: CustomerContext, rawInput: z.input<typeof contactInput>) {
+  const input = parse(contactInput, rawInput);
+  await db.update(customers).set(input).where(eq(customers.id, ctx.customerId));
 }

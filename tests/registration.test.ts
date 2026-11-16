@@ -1,8 +1,8 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import type { Db } from "@/server/db/client";
-import { branches, customers, loyaltyPrograms, staffAssignments } from "@/server/db/schema";
-import { registerCustomer } from "@/server/services/customers";
+import { auditLog, branches, customers, loyaltyPrograms, programMemberships, purchases, staffAssignments } from "@/server/db/schema";
+import { disputePurchase, registerCustomer, registerCustomerAtCounter } from "@/server/services/customers";
 import { registerStaffAccount } from "@/server/services/staff-accounts";
 import { assignEmployee } from "@/server/services/management";
 import { registerPurchase } from "@/server/services/purchases";
@@ -57,7 +57,7 @@ describe("alta de cliente", () => {
 
   it("completa el DNI de una cuenta anterior sin duplicarla", async () => {
     const user = await createAuthUser(db);
-    await db.insert(customers).values({ authUserId: user.id, fullName: "Viejo", email: user.email, qrToken: "t-" + user.id });
+    await db.insert(customers).values({ authUserId: user.id, fullName: "Viejo", email: user.email });
     const customer = await registerCustomer(db, customerInput(user));
     const rows = await db.select().from(customers).where(eq(customers.authUserId, user.id));
     expect(rows).toHaveLength(1);
@@ -131,5 +131,83 @@ describe("compra por DNI", () => {
     await expect(
       registerPurchase(db, m.employeeA, { branchId: m.branchA.id, dni: "11111111", amountCents: 10_000, idempotencyKey: key() }),
     ).rejects.toMatchObject({ code: "not_found" });
+  });
+});
+
+describe("alta en caja", () => {
+  const counter = (branchId: string, dni = newDni(), extra: { email?: string } = {}) => ({
+    branchId,
+    dni,
+    fullName: "Juan Pérez",
+    acceptPrivacy: true,
+    ...extra,
+  });
+
+  it("el empleado registra el DNI, el cliente queda unido al comercio y después suma puntos", async () => {
+    const m = await createMerchant(db);
+    const customer = await registerCustomerAtCounter(db, m.employeeA, counter(m.branchA.id, "28.111.222"));
+    expect(customer).toMatchObject({ dni: "28111222", authUserId: null, registeredByStaffId: m.employeeA.staffUserId });
+    expect(customer.privacyAcceptedAt).not.toBeNull();
+    const memberships = await db.select().from(programMemberships).where(eq(programMemberships.customerId, customer.id));
+    expect(memberships.map((x) => x.merchantId)).toEqual([m.merchant.id]);
+
+    const r = await registerPurchase(db, m.employeeA, { branchId: m.branchA.id, dni: "28111222", amountCents: 20_000, idempotencyKey: key() });
+    expect(r).toMatchObject({ balance: 2, customerName: "Juan P." });
+  });
+
+  it("exige la aceptación de privacidad, no duplica DNIs y respeta el alcance del empleado", async () => {
+    const m = await createMerchant(db);
+    await expect(registerCustomerAtCounter(db, m.employeeA, { ...counter(m.branchA.id), acceptPrivacy: false })).rejects.toMatchObject({
+      code: "invalid_input",
+    });
+    const dni = newDni();
+    await registerCustomerAtCounter(db, m.employeeA, counter(m.branchA.id, dni));
+    await expect(registerCustomerAtCounter(db, m.owner, counter(m.branchB.id, dni))).rejects.toMatchObject({ code: "dni_taken" });
+    await expect(registerCustomerAtCounter(db, m.employeeA, counter(m.branchB.id))).rejects.toMatchObject({ code: "not_found" });
+  });
+
+  it("el cliente reclama la cuenta online con su DNI y conserva los puntos", async () => {
+    const m = await createMerchant(db);
+    const dni = newDni();
+    const atCounter = await registerCustomerAtCounter(db, m.employeeA, counter(m.branchA.id, dni));
+    await registerPurchase(db, m.employeeA, { branchId: m.branchA.id, dni, amountCents: 50_000, idempotencyKey: key() });
+
+    const user = await createAuthUser(db);
+    const claimed = await registerCustomer(db, customerInput(user, dni));
+    expect(claimed.id).toBe(atCounter.id);
+    expect(claimed).toMatchObject({ authUserId: user.id, email: user.email });
+    const [membership] = await db.select().from(programMemberships).where(eq(programMemberships.customerId, claimed.id));
+    expect(membership.balance).toBe(5);
+
+    // Ya reclamada, nadie más la toma.
+    await expect(registerCustomer(db, customerInput(await createAuthUser(db), dni))).rejects.toMatchObject({ code: "dni_taken" });
+  });
+
+  it("si la caja anotó un email, solo lo reclama quien entra con ese email", async () => {
+    const m = await createMerchant(db);
+    const dni = newDni();
+    const owner = await createAuthUser(db);
+    await registerCustomerAtCounter(db, m.employeeA, counter(m.branchA.id, dni, { email: owner.email.toUpperCase() }));
+
+    await expect(registerCustomer(db, customerInput(await createAuthUser(db), dni))).rejects.toMatchObject({ code: "dni_taken" });
+    expect((await registerCustomer(db, customerInput(owner, dni))).authUserId).toBe(owner.id);
+  });
+});
+
+describe("aviso y reclamo de compras", () => {
+  it("el cliente marca una compra que no reconoce y queda auditado", async () => {
+    const m = await createMerchant(db);
+    const { customer, ctx } = await createCustomer(db);
+    const r = await registerPurchase(db, m.employeeA, { branchId: m.branchA.id, dni: customer.dni!, amountCents: 10_000, idempotencyKey: key() });
+
+    await disputePurchase(db, ctx, { purchaseId: r.purchase.id });
+    const [row] = await db.select().from(purchases).where(eq(purchases.id, r.purchase.id));
+    expect(row.disputedAt).not.toBeNull();
+    const logs = await db.select().from(auditLog).where(eq(auditLog.entityId, r.purchase.id));
+    expect(logs.map((l) => l.action)).toContain("purchase.disputed");
+
+    // Una compra ajena no se puede reclamar.
+    const other = await createCustomer(db);
+    await expect(disputePurchase(db, other.ctx, { purchaseId: r.purchase.id })).rejects.toMatchObject({ code: "not_found" });
   });
 });

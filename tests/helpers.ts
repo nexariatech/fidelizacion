@@ -13,7 +13,6 @@ import {
   staffUsers,
 } from "@/server/db/schema";
 import { loadStaffContext, type CustomerContext, type StaffContext } from "@/server/auth/context";
-import { newQrToken } from "@/server/services/customers";
 
 export async function setupTestDb() {
   const url = process.env.TEST_DATABASE_URL;
@@ -52,7 +51,7 @@ export async function createCustomer(db: Db) {
   const authUserId = randomUUID();
   const [customer] = await db
     .insert(customers)
-    .values({ authUserId, fullName: "Cliente Prueba", email: `${authUserId}@test.local`, dni: newDni(), qrToken: newQrToken() })
+    .values({ authUserId, fullName: "Cliente Prueba", email: `${authUserId}@test.local`, dni: newDni() })
     .returning();
   const ctx: CustomerContext = { kind: "customer", customerId: customer.id };
   return { customer, ctx };

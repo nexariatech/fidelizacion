@@ -11,7 +11,7 @@ import {
 } from "../integrations/google-wallet";
 import { customerMerchantDetail } from "./queries";
 
-function appOrigin() {
+export function appOrigin() {
   return process.env.APP_ORIGIN ?? (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000");
 }
 
@@ -22,7 +22,7 @@ export function isGoogleWalletEnabled() {
 async function walletCard(db: DbOrTx, customerId: string, merchantId: string): Promise<WalletCard> {
   const detail = await customerMerchantDetail(db, customerId, merchantId);
   const [customer] = await db
-    .select({ fullName: customers.fullName, qrToken: customers.qrToken })
+    .select({ fullName: customers.fullName })
     .from(customers)
     .where(eq(customers.id, customerId));
   return {
@@ -31,10 +31,7 @@ async function walletCard(db: DbOrTx, customerId: string, merchantId: string): P
     programName: detail.program.name,
     membershipId: detail.membershipId,
     customerName: customer.fullName,
-    qrToken: customer.qrToken,
     balance: detail.balance,
-    pendingProfileBonus:
-      detail.profileComplete || detail.profileBonusGranted ? 0 : detail.program.profileBonusPoints,
   };
 }
 
@@ -47,7 +44,7 @@ export async function googleWalletSaveUrl(db: DbOrTx, customerId: string, mercha
   return saveToWalletUrl(cfg, card.membershipId);
 }
 
-// Reescribe las tarjetas que el cliente ya guardó (saldo, QR y aviso de datos).
+// Reescribe las tarjetas que el cliente ya guardó (por ejemplo, tras un cambio de nombre).
 export async function syncWalletCards(db: DbOrTx, customerId: string) {
   const cfg = googleWalletConfig(appOrigin());
   if (!cfg) return;

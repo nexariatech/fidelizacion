@@ -1,7 +1,8 @@
 "use client";
 
 import { useActionState, useEffect, useRef, useState } from "react";
-import { redeemAction, registerPurchaseAction } from "@/app/actions/staff";
+import { redeemAction, registerCustomerAtCounterAction, registerPurchaseAction } from "@/app/actions/staff";
+import { ActionForm } from "@/components/action-form";
 import { QrScannerButton } from "@/components/qr-scanner";
 import { Button, Field, FormMessage, Input } from "@/components/ui";
 
@@ -75,5 +76,35 @@ export function RedeemForm({ branchId }: { branchId: string }) {
         {pending ? "Validando…" : "Validar y canjear"}
       </Button>
     </form>
+  );
+}
+
+// Alta del cliente en la caja, antes de sumarle la primera compra.
+export function CounterSignUpForm({ branchId }: { branchId: string }) {
+  return (
+    <ActionForm action={registerCustomerAtCounterAction} submitLabel="Registrar cliente" variant="secondary" className="space-y-4">
+      <input type="hidden" name="branchId" value={branchId} />
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field label="DNI">
+          <Input name="dni" inputMode="numeric" autoComplete="off" placeholder="30123456" required pattern="[0-9.\s]{7,10}" />
+        </Field>
+        <Field label="Nombre y apellido">
+          <Input name="fullName" autoComplete="off" required minLength={2} />
+        </Field>
+      </div>
+      <Field label="Email (opcional)" hint="Le avisamos ahí cada vez que suma puntos">
+        <Input name="email" type="email" autoComplete="off" />
+      </Field>
+      <label className="flex items-start gap-2 text-sm text-neutral-700">
+        <input type="checkbox" name="acceptPrivacy" required className="mt-1" />
+        <span>
+          El cliente aceptó la{" "}
+          <a href="/privacidad" target="_blank" className="font-medium text-indigo-700 underline">
+            política de privacidad
+          </a>{" "}
+          y que usemos su DNI para registrar sus puntos.
+        </span>
+      </label>
+    </ActionForm>
   );
 }

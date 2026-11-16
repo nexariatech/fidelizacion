@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  type AnyPgColumn,
   boolean,
   check,
   date,
@@ -27,26 +28,33 @@ const createdAt = () => timestamp("created_at", { withTimezone: true }).notNull(
 // auth_user_id es el id del proveedor de autenticación (Supabase Auth); no hay FK
 // para no atar el esquema a un proveedor concreto. Una cuenta de autenticación es
 // cliente o personal, nunca las dos (lo controla el código al dar de alta).
-export const customers = pgTable("customers", {
-  id: id(),
-  authUserId: uuid("auth_user_id").notNull().unique(),
-  fullName: text("full_name").notNull(),
-  email: text("email").notNull().unique(),
-  // DNI solo dígitos. Único global: identifica a la persona en todos los
-  // comercios y es lo que pide la caja para sumar puntos. Nulo solo en cuentas
-  // anteriores a esta regla; la app obliga a completarlo antes de operar.
-  dni: text("dni").unique(),
-  // Aceptación de la política de privacidad al registrarse (Ley 25.326).
-  privacyAcceptedAt: timestamp("privacy_accepted_at", { withTimezone: true }),
-  phone: text("phone"),
-  birthDate: date("birth_date"),
-  // Se marca la primera vez que el cliente completa teléfono y cumpleaños.
-  profileCompletedAt: timestamp("profile_completed_at", { withTimezone: true }),
-  // Identificador opaco que muestra la tarjeta de Google Wallet. Ya no sirve
-  // para sumar puntos (se suma por DNI).
-  qrToken: text("qr_token").notNull().unique(),
-  createdAt: createdAt(),
-}, (t) => [check("customers_dni_format", sql`${t.dni} is null or ${t.dni} ~ '^[0-9]{7,8}$'`)]);
+// Un cliente que se registró en la caja no tiene auth_user_id hasta que crea su
+// cuenta online con el mismo DNI.
+export const customers = pgTable(
+  "customers",
+  {
+    id: id(),
+    authUserId: uuid("auth_user_id").unique(),
+    fullName: text("full_name").notNull(),
+    // Opcional en el alta en caja; si está, solo esa persona puede reclamar la cuenta.
+    email: text("email").unique(),
+    // DNI solo dígitos. Único global: identifica a la persona en todos los
+    // comercios y es lo que pide la caja para sumar puntos. Nulo solo en cuentas
+    // online anteriores a esta regla; la app obliga a completarlo antes de operar.
+    dni: text("dni").unique(),
+    phone: text("phone"),
+    birthDate: date("birth_date"),
+    // Aceptación de la política de privacidad (Ley 25.326): online la marca el
+    // cliente; en caja, el empleado que lo registró (registered_by_staff_id).
+    privacyAcceptedAt: timestamp("privacy_accepted_at", { withTimezone: true }),
+    registeredByStaffId: uuid("registered_by_staff_id").references((): AnyPgColumn => staffUsers.id),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    check("customers_dni_format", sql`${t.dni} is null or ${t.dni} ~ '^[0-9]{7,8}$'`),
+    check("customers_identity", sql`${t.authUserId} is not null or ${t.dni} is not null`),
+  ],
+);
 
 // Usuarios que operan comercios (dueños, empleados) y administradores de plataforma.
 export const staffUsers = pgTable("staff_users", {
@@ -129,13 +137,10 @@ export const loyaltyPrograms = pgTable(
     accrualBase: accrualBase("accrual_base").notNull().default("total"),
     pointsPerUnit: integer("points_per_unit").notNull(),
     unitAmountCents: integer("unit_amount_cents").notNull(),
-    // Puntos de regalo por completar los datos del perfil; 0 lo desactiva.
-    profileBonusPoints: integer("profile_bonus_points").notNull().default(50),
     createdAt: createdAt(),
   },
   (t) => [
     check("loyalty_programs_rule", sql`${t.pointsPerUnit} > 0 and ${t.unitAmountCents} > 0`),
-    check("loyalty_programs_profile_bonus", sql`${t.profileBonusPoints} >= 0`),
   ],
 );
 
@@ -149,8 +154,6 @@ export const programMemberships = pgTable(
     merchantId: uuid("merchant_id").notNull().references(() => merchants.id),
     customerId: uuid("customer_id").notNull().references(() => customers.id),
     balance: integer("balance").notNull().default(0),
-    // El regalo por completar el perfil se acredita una sola vez por membresía.
-    profileBonusGrantedAt: timestamp("profile_bonus_granted_at", { withTimezone: true }),
     createdAt: createdAt(),
   },
   (t) => [
@@ -186,6 +189,8 @@ export const purchases = pgTable(
     voidedBy: uuid("voided_by").references(() => staffUsers.id),
     voidReason: text("void_reason"),
     voidedAt: timestamp("voided_at", { withTimezone: true }),
+    // El cliente avisó que no reconoce esta compra (desde el aviso de puntos).
+    disputedAt: timestamp("disputed_at", { withTimezone: true }),
     createdAt: createdAt(),
   },
   (t) => [
@@ -276,6 +281,7 @@ export const movementType = pgEnum("point_movement_type", [
   "purchase_void",
   "redemption",
   "redemption_cancel",
+  // Histórico: regalo por completar datos, eliminado el 2026-11-16.
   "profile_bonus",
 ]);
 

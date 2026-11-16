@@ -2,13 +2,13 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { after } from "next/server";
 import { getDb } from "@/server/db/client";
 import { requireCustomer, requireViewer } from "@/server/auth/session";
-import { registerCustomer } from "@/server/services/customers";
-import { completeCustomerProfile } from "@/server/services/enrollment";
+import { disputePurchase, registerCustomer } from "@/server/services/customers";
+import { updateCustomerContact } from "@/server/services/enrollment";
 import { requestRedemptionAuthorization } from "@/server/services/redemptions";
-import { googleWalletSaveUrl, syncWalletCards } from "@/server/services/wallet";
+import { googleWalletSaveUrl } from "@/server/services/wallet";
+import { DomainError } from "@/server/domain/errors";
 import { GoogleWalletError } from "@/server/integrations/google-wallet";
 import { toActionError, type ActionState } from "@/lib/action-result";
 import { safeNextPath } from "@/lib/origin";
@@ -58,17 +58,24 @@ export async function googleWalletAction(merchantId: string): Promise<{ url: str
   }
 }
 
-export async function completeProfileAction(_: ActionState, formData: FormData): Promise<ActionState> {
+export async function updateContactAction(_: ActionState, formData: FormData): Promise<ActionState> {
   const viewer = await requireCustomer();
   try {
-    const memberships = await completeCustomerProfile(getDb(), viewer.customer, {
+    await updateCustomerContact(getDb(), viewer.customer, {
       phone: String(formData.get("phone") ?? ""),
       birthDate: String(formData.get("birthDate") ?? ""),
     });
-    after(() => syncWalletCards(getDb(), viewer.customer.customerId));
-    revalidatePath("/cliente", "layout");
-    return { message: memberships.length ? "Listo. Ya sumaste tus puntos de regalo." : "Datos guardados." };
+    revalidatePath("/cliente/perfil");
+    return { message: "Datos guardados." };
   } catch (error) {
     return toActionError(error);
   }
+}
+
+export async function disputePurchaseAction(formData: FormData) {
+  const viewer = await requireCustomer();
+  await disputePurchase(getDb(), viewer.customer, { purchaseId: String(formData.get("purchaseId") ?? "") }).catch((error) => {
+    if (!(error instanceof DomainError)) throw error;
+  });
+  revalidatePath(`/cliente/${String(formData.get("merchantId") ?? "")}`);
 }

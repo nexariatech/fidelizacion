@@ -5,7 +5,7 @@ import { requireStaff } from "@/server/auth/session";
 import { getDb } from "@/server/db/client";
 import { DomainError } from "@/server/domain/errors";
 import { branchActivity } from "@/server/services/queries";
-import { PurchaseForm, RedeemForm } from "./forms";
+import { CounterSignUpForm, PurchaseForm, RedeemForm } from "./forms";
 
 export default async function BranchPage({ params }: { params: Promise<{ branchId: string }> }) {
   const { branchId } = await params;
@@ -30,6 +30,10 @@ export default async function BranchPage({ params }: { params: Promise<{ branchI
           <RedeemForm branchId={branchId} />
         </Card>
       </div>
+
+      <Card title="Cliente nuevo">
+        <CounterSignUpForm branchId={branchId} />
+      </Card>
 
       <div className="grid gap-6 md:grid-cols-2">
         <Card title="Últimas compras">

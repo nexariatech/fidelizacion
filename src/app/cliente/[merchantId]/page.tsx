@@ -8,7 +8,7 @@ import { customerMerchantDetail } from "@/server/services/queries";
 import { isGoogleWalletEnabled } from "@/server/services/wallet";
 import { GoogleWalletButton } from "./google-wallet-button";
 import { RedeemReward } from "./redeem-reward";
-import { ProfileBanner } from "../profile-banner";
+import { disputePurchaseAction } from "@/app/actions/customer";
 
 export default async function CustomerMerchantPage({ params }: { params: Promise<{ merchantId: string }> }) {
   const { merchantId } = await params;
@@ -27,10 +27,6 @@ export default async function CustomerMerchantPage({ params }: { params: Promise
         </div>
         <p className="text-3xl font-bold text-indigo-700">{detail.balance} pts</p>
       </div>
-
-      {!detail.profileComplete && detail.program.profileBonusPoints > 0 && (
-        <ProfileBanner points={detail.program.profileBonusPoints} />
-      )}
 
       {isGoogleWalletEnabled() && <GoogleWalletButton merchantId={merchantId} />}
 
@@ -69,6 +65,18 @@ export default async function CustomerMerchantPage({ params }: { params: Promise
                   <td className="py-2">
                     {movementLabels[m.type]}
                     {m.branchName && ` · ${m.branchName}`}
+                    {m.purchaseId && m.disputedAt && m.purchaseStatus !== "voided" && (
+                      <span className="ml-2">
+                        <Badge tone="amber">avisaste que no la reconoces</Badge>
+                      </span>
+                    )}
+                    {m.purchaseId && m.type === "purchase" && !m.disputedAt && m.purchaseStatus !== "voided" && (
+                      <form action={disputePurchaseAction} className="inline">
+                        <input type="hidden" name="purchaseId" value={m.purchaseId} />
+                        <input type="hidden" name="merchantId" value={merchantId} />
+                        <button className="ml-2 text-xs text-neutral-500 underline hover:text-red-700">No reconozco esta compra</button>
+                      </form>
+                    )}
                   </td>
                   <td className={`py-2 text-right font-medium ${m.points > 0 ? "text-green-700" : "text-red-700"}`}>
                     {m.points > 0 ? "+" : ""}
