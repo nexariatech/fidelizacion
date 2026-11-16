@@ -42,11 +42,17 @@ export async function createStaff(db: Db, assignments: { merchantId: string; bra
   return (await loadStaffContext(db, authUserId)) as StaffContext;
 }
 
+// DNIs únicos y válidos dentro de una corrida.
+let nextDni = 10_000_000 + Math.floor(Math.random() * 1_000_000) * 50;
+export function newDni() {
+  return String(nextDni++);
+}
+
 export async function createCustomer(db: Db) {
   const authUserId = randomUUID();
   const [customer] = await db
     .insert(customers)
-    .values({ authUserId, fullName: "Cliente", email: `${authUserId}@test.local`, qrToken: newQrToken() })
+    .values({ authUserId, fullName: "Cliente Prueba", email: `${authUserId}@test.local`, dni: newDni(), qrToken: newQrToken() })
     .returning();
   const ctx: CustomerContext = { kind: "customer", customerId: customer.id };
   return { customer, ctx };

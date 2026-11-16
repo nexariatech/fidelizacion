@@ -25,20 +25,28 @@ const createdAt = () => timestamp("created_at", { withTimezone: true }).notNull(
 
 // Cuenta global del cliente: una sola por persona, válida en todos los comercios.
 // auth_user_id es el id del proveedor de autenticación (Supabase Auth); no hay FK
-// para no atar el esquema a un proveedor concreto.
+// para no atar el esquema a un proveedor concreto. Una cuenta de autenticación es
+// cliente o personal, nunca las dos (lo controla el código al dar de alta).
 export const customers = pgTable("customers", {
   id: id(),
   authUserId: uuid("auth_user_id").notNull().unique(),
   fullName: text("full_name").notNull(),
   email: text("email").notNull().unique(),
+  // DNI solo dígitos. Único global: identifica a la persona en todos los
+  // comercios y es lo que pide la caja para sumar puntos. Nulo solo en cuentas
+  // anteriores a esta regla; la app obliga a completarlo antes de operar.
+  dni: text("dni").unique(),
+  // Aceptación de la política de privacidad al registrarse (Ley 25.326).
+  privacyAcceptedAt: timestamp("privacy_accepted_at", { withTimezone: true }),
   phone: text("phone"),
   birthDate: date("birth_date"),
   // Se marca la primera vez que el cliente completa teléfono y cumpleaños.
   profileCompletedAt: timestamp("profile_completed_at", { withTimezone: true }),
-  // Identificador opaco del QR personal. Se reemplaza si se compromete.
+  // Identificador opaco que muestra la tarjeta de Google Wallet. Ya no sirve
+  // para sumar puntos (se suma por DNI).
   qrToken: text("qr_token").notNull().unique(),
   createdAt: createdAt(),
-});
+}, (t) => [check("customers_dni_format", sql`${t.dni} is null or ${t.dni} ~ '^[0-9]{7,8}$'`)]);
 
 // Usuarios que operan comercios (dueños, empleados) y administradores de plataforma.
 export const staffUsers = pgTable("staff_users", {

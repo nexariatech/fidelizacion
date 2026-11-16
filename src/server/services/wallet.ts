@@ -73,19 +73,3 @@ export async function syncWalletBalance(membershipId: string, balance: number) {
     console.error("No se pudo actualizar Google Wallet", error),
   );
 }
-
-export async function syncWalletQrToken(db: DbOrTx, customerId: string, qrToken: string) {
-  const cfg = googleWalletConfig(appOrigin());
-  if (!cfg) return;
-  const memberships = await db
-    .select({ id: programMemberships.id })
-    .from(programMemberships)
-    .where(eq(programMemberships.customerId, customerId));
-  await Promise.all(
-    memberships.map((m) =>
-      patchWalletObject(cfg, m.id, { qrToken }).catch((error) =>
-        console.error("No se pudo actualizar Google Wallet", error),
-      ),
-    ),
-  );
-}

@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { Badge, Card, Empty } from "@/components/ui";
 import { formatDate, movementLabels } from "@/lib/format";
-import { requireViewer } from "@/server/auth/session";
+import { requireCustomer } from "@/server/auth/session";
 import { getDb } from "@/server/db/client";
 import { DomainError } from "@/server/domain/errors";
 import { customerMerchantDetail } from "@/server/services/queries";
@@ -12,7 +12,7 @@ import { ProfileBanner } from "../profile-banner";
 
 export default async function CustomerMerchantPage({ params }: { params: Promise<{ merchantId: string }> }) {
   const { merchantId } = await params;
-  const viewer = await requireViewer();
+  const viewer = await requireCustomer(`/cliente/${merchantId}`);
   const detail = await customerMerchantDetail(getDb(), viewer.customer.customerId, merchantId).catch((e) => {
     if (e instanceof DomainError) notFound();
     throw e;

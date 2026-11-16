@@ -10,7 +10,9 @@ export type DomainErrorCode =
   | "insufficient_points"
   | "reward_inactive"
   | "authorization_invalid"
-  | "already_cancelled";
+  | "already_cancelled"
+  | "dni_taken"
+  | "account_type_conflict";
 
 export class DomainError extends Error {
   constructor(

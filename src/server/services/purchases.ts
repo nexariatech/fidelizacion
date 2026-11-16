@@ -5,13 +5,14 @@ import { customers, loyaltyPrograms, pointMovements, programMemberships, purchas
 import { requireOperableBranch, requireOwner, type StaffContext } from "../auth/context";
 import { DomainError } from "../domain/errors";
 import { calculatePoints } from "../domain/points";
+import { dniSchema, maskName } from "../domain/dni";
 import { parse } from "../domain/validation";
 import { audit } from "./audit";
 import { ensureMembership } from "./memberships";
 
 const registerPurchaseInput = z.object({
   branchId: z.uuid(),
-  qrToken: z.string().min(1),
+  dni: dniSchema,
   amountCents: z.number().int().positive(),
   eligibleAmountCents: z.number().int().nonnegative().nullish(),
   externalReference: z.string().max(200).nullish(),
@@ -20,8 +21,9 @@ const registerPurchaseInput = z.object({
 
 export type RegisterPurchaseInput = z.input<typeof registerPurchaseInput>;
 
-// Registra una compra identificando al cliente por su QR personal y otorga los
-// puntos en la misma transacción. Reintentos con la misma idempotency_key
+// Registra una compra identificando al cliente por su DNI y otorga los puntos en
+// la misma transacción. Devuelve el nombre enmascarado para que la caja lo
+// confirme con el cliente. Reintentos con la misma idempotency_key
 // devuelven la compra original sin volver a sumar puntos.
 export async function registerPurchase(db: Db, ctx: StaffContext, rawInput: RegisterPurchaseInput) {
   const input = parse(registerPurchaseInput, rawInput);
@@ -39,10 +41,13 @@ export async function registerPurchase(db: Db, ctx: StaffContext, rawInput: Regi
     if (!program || !program.active) throw new DomainError("program_inactive");
 
     const [customer] = await tx
-      .select({ id: customers.id })
+      .select({ id: customers.id, fullName: customers.fullName })
       .from(customers)
-      .where(eq(customers.qrToken, input.qrToken));
-    if (!customer) throw new DomainError("not_found", "Cliente no encontrado");
+      .where(eq(customers.dni, input.dni));
+    if (!customer) {
+      throw new DomainError("not_found", "No hay ningún cliente con ese DNI. Pedile que se registre escaneando el QR del mostrador.");
+    }
+    const customerName = maskName(customer.fullName);
 
     // La membresía se crea en la primera compra si el cliente no se unió antes.
     const membership = await ensureMembership(tx, program, customer.id);
@@ -57,7 +62,7 @@ export async function registerPurchase(db: Db, ctx: StaffContext, rawInput: Regi
       if (existing.customerId !== customer.id || existing.amountCents !== input.amountCents) {
         throw new DomainError("idempotency_conflict");
       }
-      return { purchase: existing, balance: membership.balance, replayed: true };
+      return { purchase: existing, balance: membership.balance, customerName, replayed: true };
     }
 
     const rule = {
@@ -113,7 +118,7 @@ export async function registerPurchase(db: Db, ctx: StaffContext, rawInput: Regi
       data: { branchId: branch.id, amountCents: input.amountCents, points },
     });
 
-    return { purchase, balance, replayed: false };
+    return { purchase, balance, customerName, replayed: false };
   });
 }
 

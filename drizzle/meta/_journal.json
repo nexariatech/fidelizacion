@@ -15,6 +15,13 @@
       "when": 1792734106846,
       "tag": "0001_registro_google",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1794850886399,
+      "tag": "0002_dni_registro_separado",
+      "breakpoints": true
     }
   ]
 }

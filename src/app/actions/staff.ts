@@ -39,7 +39,7 @@ export async function registerPurchaseAction(_: ActionState, formData: FormData)
     const branchId = text(formData, "branchId");
     const r = await registerPurchase(getDb(), staff, {
       branchId,
-      qrToken: text(formData, "qrToken"),
+      dni: text(formData, "dni"),
       amountCents,
       eligibleAmountCents,
       externalReference: text(formData, "reference") || null,
@@ -48,7 +48,7 @@ export async function registerPurchaseAction(_: ActionState, formData: FormData)
     revalidatePath(`/comercio/sucursal/${branchId}`);
     after(() => syncWalletBalance(r.purchase.membershipId, r.balance));
     return {
-      message: `Compra de ${formatMoney(r.purchase.amountCents)} registrada: +${r.purchase.pointsAwarded} pts. Saldo: ${r.balance} pts.`,
+      message: `Compra de ${formatMoney(r.purchase.amountCents)} para ${r.customerName}: +${r.purchase.pointsAwarded} pts. Saldo: ${r.balance} pts.`,
     };
   } catch (error) {
     return toActionError(error);

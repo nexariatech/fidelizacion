@@ -7,7 +7,6 @@ import { Button, Field, FormMessage, Input } from "@/components/ui";
 
 export function PurchaseForm({ branchId, askEligible }: { branchId: string; askEligible: boolean }) {
   const [state, action, pending] = useActionState(registerPurchaseAction, null);
-  const [qrToken, setQrToken] = useState("");
   // Una clave por compra: si la red falla y se reenvía, no se duplica.
   const [idempotencyKey, setIdempotencyKey] = useState(() => crypto.randomUUID());
   const formRef = useRef<HTMLFormElement>(null);
@@ -15,7 +14,6 @@ export function PurchaseForm({ branchId, askEligible }: { branchId: string; askE
   useEffect(() => {
     if (state?.message) {
       formRef.current?.reset();
-      setQrToken("");
       setIdempotencyKey(crypto.randomUUID());
     }
   }, [state]);
@@ -24,17 +22,8 @@ export function PurchaseForm({ branchId, askEligible }: { branchId: string; askE
     <form ref={formRef} action={action} className="space-y-4">
       <input type="hidden" name="branchId" value={branchId} />
       <input type="hidden" name="idempotencyKey" value={idempotencyKey} />
-      <Field label="QR del cliente">
-        <div className="space-y-2">
-          <QrScannerButton onResult={setQrToken} label="Escanear QR del cliente" />
-          <Input
-            name="qrToken"
-            value={qrToken}
-            onChange={(e) => setQrToken(e.target.value)}
-            placeholder="o pega el código del QR"
-            required
-          />
-        </div>
+      <Field label="DNI del cliente" hint="Confirma con el cliente el nombre que aparece al registrar">
+        <Input name="dni" inputMode="numeric" autoComplete="off" placeholder="30123456" required pattern="[0-9.\s]{7,10}" />
       </Field>
       <Field label="Importe total">
         <Input name="amount" inputMode="decimal" placeholder="0,00" required />

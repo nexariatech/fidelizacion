@@ -1,6 +1,5 @@
 "use server";
 
-import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -21,21 +20,41 @@ export async function signIn(_: ActionState, formData: FormData): Promise<Action
   redirect(safeNextPath(formData.get("next")));
 }
 
-const signUpInput = credentials.extend({ fullName: z.string().trim().min(2).max(120) });
+const staffSignUpInput = credentials.extend({
+  fullName: z.string().trim().min(2).max(120),
+  merchantName: z.string().trim().max(120),
+  branchName: z.string().trim().max(120),
+});
 
-export async function signUp(_: ActionState, formData: FormData): Promise<ActionState> {
-  const parsed = signUpInput.safeParse(Object.fromEntries(formData));
+// Alta de personal (dueño o empleado), separada de la de clientes. La cuenta de
+// personal y el comercio se crean en el primer acceso, ya confirmado el email
+// (ver getViewer), con los datos que quedan en los metadatos de la cuenta.
+export async function signUpStaff(_: ActionState, formData: FormData): Promise<ActionState> {
+  const parsed = staffSignUpInput.safeParse({
+    ...Object.fromEntries(formData),
+    merchantName: formData.get("merchantName") ?? "",
+    branchName: formData.get("branchName") ?? "",
+  });
   if (!parsed.success) return { error: "Completa nombre, email y una contraseña de al menos 8 caracteres." };
-  const origin = (await headers()).get("origin") ?? "";
+  const isOwner = formData.get("role") !== "employee";
+  if (isOwner && parsed.data.merchantName.length < 2) return { error: "Escribe el nombre de tu comercio." };
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase.auth.signUp({
     email: parsed.data.email,
     password: parsed.data.password,
-    options: { data: { full_name: parsed.data.fullName }, emailRedirectTo: `${origin}/auth/callback` },
+    options: {
+      data: {
+        full_name: parsed.data.fullName,
+        account_type: "staff",
+        merchant_name: isOwner ? parsed.data.merchantName : null,
+        branch_name: isOwner ? parsed.data.branchName || "Principal" : null,
+      },
+      emailRedirectTo: callbackUrl(await requestOrigin(), "/inicio"),
+    },
   });
   if (error) return { error: "No se pudo crear la cuenta. ¿Ya estás registrado?" };
   if (data.session) redirect("/inicio");
-  return { message: "Te enviamos un correo para confirmar tu cuenta." };
+  return { message: "Te enviamos un correo para confirmar tu cuenta. Al confirmarla entras directo a tu panel." };
 }
 
 function callbackUrl(origin: string, next: string) {

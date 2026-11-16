@@ -1,12 +1,12 @@
 import { completeProfileAction } from "@/app/actions/customer";
 import { ActionForm } from "@/components/action-form";
 import { Card, Field, Input } from "@/components/ui";
-import { requireViewer } from "@/server/auth/session";
+import { requireCustomer } from "@/server/auth/session";
 import { getDb } from "@/server/db/client";
 import { customerProfile } from "@/server/services/queries";
 
 export default async function ProfilePage() {
-  const viewer = await requireViewer();
+  const viewer = await requireCustomer();
   const profile = await customerProfile(getDb(), viewer.customer.customerId);
 
   return (

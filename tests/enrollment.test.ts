@@ -81,7 +81,7 @@ describe("completar datos", () => {
 
     const r = await registerPurchase(db, m.employeeA, {
       branchId: m.branchA.id,
-      qrToken: customer.qrToken,
+      dni: customer.dni!,
       amountCents: 30_000,
       idempotencyKey: key(),
     });

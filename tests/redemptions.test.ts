@@ -20,7 +20,7 @@ async function scenario() {
   const c = await createCustomer(db);
   await registerPurchase(db, m.owner, {
     branchId: m.branchA.id,
-    qrToken: c.customer.qrToken,
+    dni: c.customer.dni!,
     amountCents: 1_200_000,
     idempotencyKey: key(),
   });
@@ -83,7 +83,7 @@ describe("canje", () => {
   it("sin puntos suficientes no se emite código", async () => {
     const m = await createMerchant(db);
     const c = await createCustomer(db);
-    await registerPurchase(db, m.owner, { branchId: m.branchA.id, qrToken: c.customer.qrToken, amountCents: 100_000, idempotencyKey: key() });
+    await registerPurchase(db, m.owner, { branchId: m.branchA.id, dni: c.customer.dni!, amountCents: 100_000, idempotencyKey: key() });
     await expect(
       requestRedemptionAuthorization(db, c.ctx, { rewardId: m.reward.id, branchId: m.branchA.id }),
     ).rejects.toMatchObject({ code: "insufficient_points" });
@@ -103,7 +103,7 @@ describe("canje", () => {
     const m = await createMerchant(db);
     const c = await createCustomer(db);
     // 60 puntos: alcanza para un solo canje de 50.
-    await registerPurchase(db, m.owner, { branchId: m.branchA.id, qrToken: c.customer.qrToken, amountCents: 600_000, idempotencyKey: key() });
+    await registerPurchase(db, m.owner, { branchId: m.branchA.id, dni: c.customer.dni!, amountCents: 600_000, idempotencyKey: key() });
     const authA = await requestRedemptionAuthorization(db, c.ctx, { rewardId: m.reward.id, branchId: m.branchA.id });
     // Se inserta a mano un segundo código pendiente en la otra sucursal
     // (simula dos dispositivos con la sesión abierta).

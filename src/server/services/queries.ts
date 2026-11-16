@@ -24,7 +24,7 @@ export async function customerOverview(db: DbOrTx, customerId: string) {
   const [customer] = await db
     .select({
       fullName: customers.fullName,
-      qrToken: customers.qrToken,
+      dni: customers.dni,
       profileComplete: customers.profileCompletedAt,
     })
     .from(customers)

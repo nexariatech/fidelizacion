@@ -20,7 +20,7 @@ describe("registerPurchase", () => {
 
     const r = await registerPurchase(db, m.employeeA, {
       branchId: m.branchA.id,
-      qrToken: customer.qrToken,
+      dni: customer.dni!,
       amountCents: 35_000,
       idempotencyKey: key(),
     });
@@ -37,15 +37,15 @@ describe("registerPurchase", () => {
   it("el saldo se comparte entre sucursales del mismo comercio", async () => {
     const m = await createMerchant(db);
     const { customer } = await createCustomer(db);
-    await registerPurchase(db, m.owner, { branchId: m.branchA.id, qrToken: customer.qrToken, amountCents: 20_000, idempotencyKey: key() });
-    const r = await registerPurchase(db, m.owner, { branchId: m.branchB.id, qrToken: customer.qrToken, amountCents: 30_000, idempotencyKey: key() });
+    await registerPurchase(db, m.owner, { branchId: m.branchA.id, dni: customer.dni!, amountCents: 20_000, idempotencyKey: key() });
+    const r = await registerPurchase(db, m.owner, { branchId: m.branchB.id, dni: customer.dni!, amountCents: 30_000, idempotencyKey: key() });
     expect(r.balance).toBe(5);
   });
 
   it("un reintento con la misma clave no duplica puntos", async () => {
     const m = await createMerchant(db);
     const { customer } = await createCustomer(db);
-    const input = { branchId: m.branchA.id, qrToken: customer.qrToken, amountCents: 50_000, idempotencyKey: key() };
+    const input = { branchId: m.branchA.id, dni: customer.dni!, amountCents: 50_000, idempotencyKey: key() };
 
     const results = await Promise.all([
       registerPurchase(db, m.employeeA, input),
@@ -62,9 +62,9 @@ describe("registerPurchase", () => {
     const m = await createMerchant(db);
     const { customer } = await createCustomer(db);
     const k = key();
-    await registerPurchase(db, m.employeeA, { branchId: m.branchA.id, qrToken: customer.qrToken, amountCents: 10_000, idempotencyKey: k });
+    await registerPurchase(db, m.employeeA, { branchId: m.branchA.id, dni: customer.dni!, amountCents: 10_000, idempotencyKey: k });
     await expect(
-      registerPurchase(db, m.employeeA, { branchId: m.branchA.id, qrToken: customer.qrToken, amountCents: 99_000, idempotencyKey: k }),
+      registerPurchase(db, m.employeeA, { branchId: m.branchA.id, dni: customer.dni!, amountCents: 99_000, idempotencyKey: k }),
     ).rejects.toMatchObject({ code: "idempotency_conflict" });
   });
 
@@ -73,7 +73,7 @@ describe("registerPurchase", () => {
     const { customer } = await createCustomer(db);
     const r = await registerPurchase(db, m.employeeA, {
       branchId: m.branchA.id,
-      qrToken: customer.qrToken,
+      dni: customer.dni!,
       amountCents: 80_000,
       eligibleAmountCents: 30_000,
       idempotencyKey: key(),
@@ -84,11 +84,11 @@ describe("registerPurchase", () => {
   it("rechaza QR inexistente e importes inválidos", async () => {
     const m = await createMerchant(db);
     await expect(
-      registerPurchase(db, m.employeeA, { branchId: m.branchA.id, qrToken: "no-existe", amountCents: 10_000, idempotencyKey: key() }),
+      registerPurchase(db, m.employeeA, { branchId: m.branchA.id, dni: "99999999", amountCents: 10_000, idempotencyKey: key() }),
     ).rejects.toMatchObject({ code: "not_found" });
     const { customer } = await createCustomer(db);
     await expect(
-      registerPurchase(db, m.employeeA, { branchId: m.branchA.id, qrToken: customer.qrToken, amountCents: -5, idempotencyKey: key() }),
+      registerPurchase(db, m.employeeA, { branchId: m.branchA.id, dni: customer.dni!, amountCents: -5, idempotencyKey: key() }),
     ).rejects.toMatchObject({ code: "invalid_input" });
   });
 });
@@ -97,7 +97,7 @@ describe("voidPurchase", () => {
   it("el dueño anula y se descuentan los puntos", async () => {
     const m = await createMerchant(db);
     const { customer } = await createCustomer(db);
-    const r = await registerPurchase(db, m.employeeA, { branchId: m.branchA.id, qrToken: customer.qrToken, amountCents: 40_000, idempotencyKey: key() });
+    const r = await registerPurchase(db, m.employeeA, { branchId: m.branchA.id, dni: customer.dni!, amountCents: 40_000, idempotencyKey: key() });
 
     const v = await voidPurchase(db, m.owner, { purchaseId: r.purchase.id, reason: "Error de carga" });
     expect(v.purchase.status).toBe("voided");
@@ -110,7 +110,7 @@ describe("voidPurchase", () => {
   it("un empleado no puede anular", async () => {
     const m = await createMerchant(db);
     const { customer } = await createCustomer(db);
-    const r = await registerPurchase(db, m.employeeA, { branchId: m.branchA.id, qrToken: customer.qrToken, amountCents: 40_000, idempotencyKey: key() });
+    const r = await registerPurchase(db, m.employeeA, { branchId: m.branchA.id, dni: customer.dni!, amountCents: 40_000, idempotencyKey: key() });
     await expect(voidPurchase(db, m.employeeA, { purchaseId: r.purchase.id, reason: "Error" })).rejects.toMatchObject({
       code: "not_found",
     });

@@ -51,7 +51,7 @@ export default async function OwnerPage({ params }: { params: Promise<{ merchant
         <div className="flex flex-wrap items-center gap-6">
           <div className="w-44 shrink-0" dangerouslySetInnerHTML={{ __html: joinQrSvg }} />
           <div className="min-w-0 space-y-2 text-sm text-neutral-600">
-            <p>Imprímelo y déjalo a la vista. El cliente lo escanea, entra con Google y queda registrado en tu programa.</p>
+            <p>Imprímelo y déjalo a la vista. El cliente lo escanea, entra con Google, carga su DNI una sola vez y queda registrado en tu programa. Para sumar puntos después, solo te dice su DNI.</p>
             <code className="block break-all select-all rounded bg-neutral-100 p-2 text-xs">{joinUrl}</code>
           </div>
         </div>

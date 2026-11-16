@@ -1,17 +1,15 @@
 import Link from "next/link";
-import QRCode from "qrcode";
-import { rotateQrAction } from "@/app/actions/customer";
 import { Card, Empty } from "@/components/ui";
-import { requireViewer } from "@/server/auth/session";
+import { requireCustomer } from "@/server/auth/session";
 import { getDb } from "@/server/db/client";
 import { customerOverview } from "@/server/services/queries";
 import { ProfileBanner } from "./profile-banner";
+import { formatDni } from "@/server/domain/dni";
 
 export default async function CustomerHome({ searchParams }: { searchParams: Promise<{ comercio?: string }> }) {
   const { comercio } = await searchParams;
-  const viewer = await requireViewer();
+  const viewer = await requireCustomer();
   const { customer, memberships } = await customerOverview(getDb(), viewer.customer.customerId);
-  const qrSvg = await QRCode.toString(customer.qrToken, { type: "svg", margin: 1, width: 240 });
 
   return (
     <>
@@ -22,26 +20,19 @@ export default async function CustomerHome({ searchParams }: { searchParams: Pro
       )}
       {!customer.profileComplete && <ProfileBanner />}
       <div className="grid gap-6 md:grid-cols-[300px_1fr]">
-        <Card title="Mi QR">
+        <Card title="Para sumar puntos">
           <div className="space-y-3 text-center">
-            <div className="mx-auto w-60" dangerouslySetInnerHTML={{ __html: qrSvg }} />
-            <p className="text-sm text-neutral-600">Muéstralo en la caja para sumar puntos.</p>
-            <p className="text-xs text-neutral-500">Este QR solo te identifica: no sirve para canjear puntos.</p>
-            <details className="text-xs text-neutral-500">
-              <summary className="cursor-pointer">Ver código del QR</summary>
-              <code className="mt-1 block break-all select-all rounded bg-neutral-100 p-2">{customer.qrToken}</code>
-            </details>
-            <form action={rotateQrAction}>
-              <button className="text-xs text-neutral-500 underline hover:text-neutral-800">
-                Generar un QR nuevo (invalida el actual)
-              </button>
-            </form>
+            <p className="text-sm text-neutral-600">Dile tu DNI en la caja:</p>
+            <p className="font-mono text-3xl font-bold tracking-wider text-indigo-800">{customer.dni ? formatDni(customer.dni) : "—"}</p>
+            <p className="text-xs text-neutral-500">
+              Para canjear, entra al comercio y genera el código de la recompensa: solo vale en ese comercio.
+            </p>
           </div>
         </Card>
 
         <Card title={`Hola, ${customer.fullName}`}>
           {memberships.length === 0 ? (
-            <Empty>Todavía no sumaste puntos. Muestra tu QR en un comercio adherido.</Empty>
+            <Empty>Todavía no sumaste puntos. Di tu DNI en la caja de un comercio adherido.</Empty>
           ) : (
             <ul className="divide-y divide-neutral-100">
               {memberships.map((m) => (

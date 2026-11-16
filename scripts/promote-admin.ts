@@ -2,7 +2,8 @@
 // Marca como administrador de plataforma a una cuenta ya registrada.
 import "dotenv/config";
 import { createDb } from "../src/server/db/client";
-import { staffUsers } from "../src/server/db/schema";
+import { eq } from "drizzle-orm";
+import { customers, staffUsers } from "../src/server/db/schema";
 import { findAuthUserIdByEmail } from "../src/server/auth/identity";
 
 async function main() {
@@ -12,6 +13,8 @@ async function main() {
   try {
     const authUserId = await findAuthUserIdByEmail(db, email);
     if (!authUserId) throw new Error(`No existe una cuenta registrada con ${email}`);
+    const [customer] = await db.select({ id: customers.id }).from(customers).where(eq(customers.authUserId, authUserId));
+    if (customer) throw new Error(`${email} es una cuenta de cliente. Registra el administrador en /registro/comercio con otro email.`);
     await db
       .insert(staffUsers)
       .values({ authUserId, email, fullName: email.split("@")[0], isPlatformAdmin: true })

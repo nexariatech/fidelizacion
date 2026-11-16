@@ -15,6 +15,8 @@ const messages: Record<DomainErrorCode, string> = {
   reward_inactive: "La recompensa no está disponible.",
   authorization_invalid: "Código inválido, vencido o ya usado.",
   already_cancelled: "El canje ya estaba cancelado.",
+  dni_taken: "Ese DNI ya está registrado en otra cuenta.",
+  account_type_conflict: "Esta cuenta ya está registrada con otro tipo (cliente o comercio). Usa otro email.",
 };
 
 // Traduce errores de negocio a mensajes para el usuario; el resto se relanza.

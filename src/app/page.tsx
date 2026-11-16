@@ -17,6 +17,9 @@ export default async function Home() {
             Iniciar sesión
           </ButtonLink>
         </div>
+        <a href="/registro/comercio" className="block text-sm font-medium text-indigo-700">
+          ¿Tienes un comercio? Regístralo
+        </a>
       </div>
     </main>
   );

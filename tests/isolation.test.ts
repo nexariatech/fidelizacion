@@ -17,7 +17,7 @@ describe("aislamiento entre comercios y sucursales", () => {
     const m = await createMerchant(db);
     const { customer } = await createCustomer(db);
     await expect(
-      registerPurchase(db, m.employeeA, { branchId: m.branchB.id, qrToken: customer.qrToken, amountCents: 10_000, idempotencyKey: key() }),
+      registerPurchase(db, m.employeeA, { branchId: m.branchB.id, dni: customer.dni!, amountCents: 10_000, idempotencyKey: key() }),
     ).rejects.toMatchObject({ code: "not_found" });
   });
 
@@ -26,10 +26,10 @@ describe("aislamiento entre comercios y sucursales", () => {
     const b = await createMerchant(db);
     const { customer } = await createCustomer(db);
     await expect(
-      registerPurchase(db, a.owner, { branchId: b.branchA.id, qrToken: customer.qrToken, amountCents: 10_000, idempotencyKey: key() }),
+      registerPurchase(db, a.owner, { branchId: b.branchA.id, dni: customer.dni!, amountCents: 10_000, idempotencyKey: key() }),
     ).rejects.toMatchObject({ code: "not_found" });
 
-    const p = await registerPurchase(db, b.owner, { branchId: b.branchA.id, qrToken: customer.qrToken, amountCents: 10_000, idempotencyKey: key() });
+    const p = await registerPurchase(db, b.owner, { branchId: b.branchA.id, dni: customer.dni!, amountCents: 10_000, idempotencyKey: key() });
     await expect(voidPurchase(db, a.owner, { purchaseId: p.purchase.id, reason: "Intento" })).rejects.toMatchObject({
       code: "not_found",
     });
@@ -39,7 +39,7 @@ describe("aislamiento entre comercios y sucursales", () => {
     const a = await createMerchant(db);
     const b = await createMerchant(db);
     const c = await createCustomer(db);
-    await registerPurchase(db, a.owner, { branchId: a.branchA.id, qrToken: c.customer.qrToken, amountCents: 1_000_000, idempotencyKey: key() });
+    await registerPurchase(db, a.owner, { branchId: a.branchA.id, dni: c.customer.dni!, amountCents: 1_000_000, idempotencyKey: key() });
     await expect(
       requestRedemptionAuthorization(db, c.ctx, { rewardId: b.reward.id, branchId: b.branchA.id }),
     ).rejects.toMatchObject({ code: "not_found" });
@@ -53,7 +53,7 @@ describe("aislamiento entre comercios y sucursales", () => {
     const a = await createMerchant(db);
     const b = await createMerchant(db);
     const c = await createCustomer(db);
-    await registerPurchase(db, a.owner, { branchId: a.branchA.id, qrToken: c.customer.qrToken, amountCents: 1_000_000, idempotencyKey: key() });
+    await registerPurchase(db, a.owner, { branchId: a.branchA.id, dni: c.customer.dni!, amountCents: 1_000_000, idempotencyKey: key() });
     const auth = await requestRedemptionAuthorization(db, c.ctx, { rewardId: a.reward.id, branchId: a.branchA.id });
     await expect(redeemWithCode(db, b.owner, { branchId: b.branchA.id, code: auth.code })).rejects.toMatchObject({
       code: "authorization_invalid",

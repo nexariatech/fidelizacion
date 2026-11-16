@@ -1,12 +1,12 @@
 # Fidelización
 
-SaaS de fidelización multi-comercio y multi-sucursal: el cliente se identifica con su QR personal, el comercio registra compras que otorgan puntos y el cliente los canjea con un código temporal de un solo uso.
+SaaS de fidelización multi-comercio y multi-sucursal: el cliente se registra una vez con su DNI, la caja suma puntos con ese DNI y el cliente los canjea con un código (y QR) temporal de un solo uso que solo vale en ese comercio.
 
 ## Stack
 
 - Next.js (App Router) + TypeScript
 - PostgreSQL (Supabase en producción) con Drizzle ORM
-- Supabase Auth: clientes con Google o link por email; personal con email y contraseña
+- Supabase Auth: clientes con Google o link por email (+ DNI obligatorio en `/alta`); personal con email y contraseña en `/registro/comercio`. Una cuenta es cliente o personal, nunca las dos.
 - Vitest con pruebas contra un Postgres real
 
 ## Estructura
@@ -39,10 +39,10 @@ pnpm dev
 
 1. Cargar las variables de `.env.example` (en local en `.env`, en producción en Vercel).
 2. `pnpm db:migrate` para crear las tablas.
-3. Registrarse en `/registro` y confirmar el email.
-4. `pnpm admin:promote tu@email.com` para ser administrador de plataforma.
-5. En `/admin`, crear un comercio con el email del dueño (ya registrado).
-6. El dueño agrega sucursales, recompensas y empleados desde `/comercio`.
+3. El dueño se registra en `/registro/comercio` (crea su comercio, programa y primera sucursal) y confirma el email.
+4. Los empleados se registran en `/registro/comercio` como "Soy empleado" y el dueño los asigna desde `/comercio`.
+5. Opcional: `pnpm admin:promote tu@email.com` (cuenta de personal) para ver `/admin`.
+6. Los clientes escanean el QR del mostrador, entran con Google y cargan su DNI una sola vez.
 
 ## Login con Google
 
