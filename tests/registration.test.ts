@@ -130,7 +130,7 @@ describe("compra por DNI", () => {
     const m = await createMerchant(db);
     await expect(
       registerPurchase(db, m.employeeA, { branchId: m.branchA.id, dni: "11111111", amountCents: 10_000, idempotencyKey: key() }),
-    ).rejects.toMatchObject({ code: "not_found" });
+    ).rejects.toMatchObject({ code: "dni_not_registered" });
   });
 });
 

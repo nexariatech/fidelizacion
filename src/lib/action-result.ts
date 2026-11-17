@@ -1,6 +1,8 @@
 import { DomainError, type DomainErrorCode } from "@/server/domain/errors";
 
-export type ActionState = { error?: string; message?: string } | null;
+// code: el error de negocio, para que el formulario reaccione (p. ej. ofrecer el
+// alta del cliente cuando el DNI no está registrado).
+export type ActionState = { error?: string; message?: string; code?: DomainErrorCode } | null;
 
 const messages: Record<DomainErrorCode, string> = {
   invalid_input: "Revisa los datos ingresados.",
@@ -16,14 +18,15 @@ const messages: Record<DomainErrorCode, string> = {
   authorization_invalid: "Código inválido, vencido o ya usado.",
   already_cancelled: "El canje ya estaba cancelado.",
   dni_taken: "Ese DNI ya está registrado en otra cuenta.",
+  dni_not_registered: "Ese DNI no está registrado. Completa su nombre abajo para darlo de alta.",
   account_type_conflict: "Esta cuenta ya está registrada con otro tipo (cliente o comercio). Usa otro email.",
 };
 
 // Traduce errores de negocio a mensajes para el usuario; el resto se relanza.
-export function toActionError(error: unknown): { error: string } {
+export function toActionError(error: unknown): { error: string; code: DomainErrorCode } {
   if (error instanceof DomainError) {
     const custom = error.message !== error.code && error.code !== "invalid_input" ? error.message : null;
-    return { error: custom ?? messages[error.code] };
+    return { error: custom ?? messages[error.code], code: error.code };
   }
   throw error;
 }
