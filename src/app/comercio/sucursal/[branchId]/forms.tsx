@@ -5,41 +5,121 @@ import { redeemAction, registerCustomerAtCounterAction, registerPurchaseAction }
 import { ActionForm } from "@/components/action-form";
 import { QrScannerButton } from "@/components/qr-scanner";
 import { Button, Field, FormMessage, Input } from "@/components/ui";
+import type { ActionState } from "@/lib/action-result";
+import { formatDni, normalizeDni } from "@/server/domain/dni";
 
 export function PurchaseForm({ branchId, askEligible }: { branchId: string; askEligible: boolean }) {
   const [state, action, pending] = useActionState(registerPurchaseAction, null);
   // Una clave por compra: si la red falla y se reenvía, no se duplica.
   const [idempotencyKey, setIdempotencyKey] = useState(() => crypto.randomUUID());
-  const formRef = useRef<HTMLFormElement>(null);
+  // Campos controlados: tras un error (p. ej. DNI no registrado) no se pierde lo cargado.
+  const [dni, setDni] = useState("");
+  const [amount, setAmount] = useState("");
+  const [eligibleAmount, setEligibleAmount] = useState("");
+  const [reference, setReference] = useState("");
+  const [submittedDni, setSubmittedDni] = useState("");
+  // Alta hecha desde este formulario, ligada al resultado que la pidió.
+  const [registered, setRegistered] = useState<{ forState: ActionState; message: string } | null>(null);
+  const submitRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (state?.message) {
-      formRef.current?.reset();
+      setDni("");
+      setAmount("");
+      setEligibleAmount("");
+      setReference("");
       setIdempotencyKey(crypto.randomUUID());
     }
   }, [state]);
 
+  // Si el DNI no está registrado, se ofrece el alta ahí mismo con ese DNI ya
+  // cargado. Si la caja corrige el DNI, el alta se oculta hasta volver a intentar.
+  const pendingDni = normalizeDni(submittedDni);
+  const askSignUp =
+    state?.code === "dni_not_registered" &&
+    registered?.forState !== state &&
+    pendingDni !== null &&
+    normalizeDni(dni) === pendingDni;
+  const shown: ActionState = registered?.forState === state ? { message: registered.message } : state;
+
+  const onRegistered = (message: string) => setRegistered({ forState: state, message });
+
+  // Con el cliente ya dado de alta, la compra queda lista para confirmar.
+  useEffect(() => {
+    if (registered) submitRef.current?.focus();
+  }, [registered]);
+
   return (
-    <form ref={formRef} action={action} className="space-y-4">
-      <input type="hidden" name="branchId" value={branchId} />
-      <input type="hidden" name="idempotencyKey" value={idempotencyKey} />
-      <Field label="DNI del cliente" hint="Confirma con el cliente el nombre que aparece al registrar">
-        <Input name="dni" inputMode="numeric" autoComplete="off" placeholder="30123456" required pattern="[0-9.\s]{7,10}" />
-      </Field>
-      <Field label="Importe total">
-        <Input name="amount" inputMode="decimal" placeholder="0,00" required />
-      </Field>
-      {askEligible && (
-        <Field label="Importe que suma puntos" hint="El programa calcula puntos sobre este importe">
-          <Input name="eligibleAmount" inputMode="decimal" placeholder="0,00" required />
+    <div className="space-y-4">
+      <form action={action} onSubmit={() => setSubmittedDni(dni)} className="space-y-4">
+        <input type="hidden" name="branchId" value={branchId} />
+        <input type="hidden" name="idempotencyKey" value={idempotencyKey} />
+        <Field label="DNI del cliente" hint="Confirma con el cliente el nombre que aparece al registrar">
+          <Input
+            name="dni"
+            value={dni}
+            onChange={(e) => setDni(e.target.value)}
+            inputMode="numeric"
+            autoComplete="off"
+            placeholder="30123456"
+            required
+            pattern="[0-9.\s]{7,10}"
+          />
         </Field>
-      )}
-      <Field label="Referencia (opcional)" hint="Número de ticket o factura">
-        <Input name="reference" />
-      </Field>
-      <FormMessage state={state} />
-      <Button type="submit" disabled={pending} className="w-full">
-        {pending ? "Registrando…" : "Registrar compra"}
+        <Field label="Importe total">
+          <Input name="amount" value={amount} onChange={(e) => setAmount(e.target.value)} inputMode="decimal" placeholder="0,00" required />
+        </Field>
+        {askEligible && (
+          <Field label="Importe que suma puntos" hint="El programa calcula puntos sobre este importe">
+            <Input
+              name="eligibleAmount"
+              value={eligibleAmount}
+              onChange={(e) => setEligibleAmount(e.target.value)}
+              inputMode="decimal"
+              placeholder="0,00"
+              required
+            />
+          </Field>
+        )}
+        <Field label="Referencia (opcional)" hint="Número de ticket o factura">
+          <Input name="reference" value={reference} onChange={(e) => setReference(e.target.value)} />
+        </Field>
+        <FormMessage state={shown} />
+        <Button ref={submitRef} type="submit" disabled={pending || askSignUp} className="w-full">
+          {pending ? "Registrando…" : "Registrar compra"}
+        </Button>
+      </form>
+      {askSignUp && <QuickSignUpForm branchId={branchId} dni={pendingDni} onRegistered={onRegistered} />}
+    </div>
+  );
+}
+
+// Alta en el momento, cuando la compra se rechazó por DNI no registrado: el DNI
+// ya viene cargado y la caja solo pide el nombre (y el email, si lo quiere dar).
+function QuickSignUpForm({
+  branchId,
+  dni,
+  onRegistered,
+}: {
+  branchId: string;
+  dni: string;
+  onRegistered: (message: string) => void;
+}) {
+  const [state, action, pending] = useActionState(async (prev: ActionState, formData: FormData) => {
+    const result = await registerCustomerAtCounterAction(prev, formData);
+    if (result?.message) onRegistered(result.message);
+    return result;
+  }, null);
+
+  return (
+    <form action={action} className="space-y-3 rounded-lg border border-amber-200 bg-amber-50 p-4">
+      <input type="hidden" name="branchId" value={branchId} />
+      <input type="hidden" name="dni" value={dni} />
+      <p className="text-sm font-semibold text-neutral-800">Cliente nuevo · DNI {formatDni(dni)}</p>
+      <NewCustomerFields autoFocusName />
+      {state?.error && <FormMessage state={state} />}
+      <Button type="submit" variant="secondary" disabled={pending} className="w-full">
+        {pending ? "Registrando…" : "Registrar cliente"}
       </Button>
     </form>
   );
@@ -84,14 +164,20 @@ export function CounterSignUpForm({ branchId }: { branchId: string }) {
   return (
     <ActionForm action={registerCustomerAtCounterAction} submitLabel="Registrar cliente" variant="secondary" className="space-y-4">
       <input type="hidden" name="branchId" value={branchId} />
-      <div className="grid gap-3 sm:grid-cols-2">
-        <Field label="DNI">
-          <Input name="dni" inputMode="numeric" autoComplete="off" placeholder="30123456" required pattern="[0-9.\s]{7,10}" />
-        </Field>
-        <Field label="Nombre y apellido">
-          <Input name="fullName" autoComplete="off" required minLength={2} />
-        </Field>
-      </div>
+      <Field label="DNI">
+        <Input name="dni" inputMode="numeric" autoComplete="off" placeholder="30123456" required pattern="[0-9.\s]{7,10}" />
+      </Field>
+      <NewCustomerFields />
+    </ActionForm>
+  );
+}
+
+function NewCustomerFields({ autoFocusName = false }: { autoFocusName?: boolean }) {
+  return (
+    <>
+      <Field label="Nombre y apellido">
+        <Input name="fullName" autoComplete="off" required minLength={2} autoFocus={autoFocusName} />
+      </Field>
       <Field label="Email (opcional)" hint="Le mandamos la bienvenida y un aviso cada vez que suma puntos">
         <Input name="email" type="email" autoComplete="off" />
       </Field>
@@ -105,6 +191,6 @@ export function CounterSignUpForm({ branchId }: { branchId: string }) {
           y que usemos su DNI para registrar sus puntos.
         </span>
       </label>
-    </ActionForm>
+    </>
   );
 }

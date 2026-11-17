@@ -12,6 +12,7 @@ export type DomainErrorCode =
   | "authorization_invalid"
   | "already_cancelled"
   | "dni_taken"
+  | "dni_not_registered"
   | "account_type_conflict";
 
 export class DomainError extends Error {

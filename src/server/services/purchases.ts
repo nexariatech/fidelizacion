@@ -44,9 +44,8 @@ export async function registerPurchase(db: Db, ctx: StaffContext, rawInput: Regi
       .select({ id: customers.id, fullName: customers.fullName })
       .from(customers)
       .where(eq(customers.dni, input.dni));
-    if (!customer) {
-      throw new DomainError("not_found", "Ese DNI no está registrado. Regístralo primero en \"Cliente nuevo\" y después suma la compra.");
-    }
+    // La caja lo da de alta en el momento (con este DNI ya cargado) y reintenta.
+    if (!customer) throw new DomainError("dni_not_registered");
     const customerName = maskName(customer.fullName);
 
     // La membresía se crea en la primera compra si el cliente no se unió antes.

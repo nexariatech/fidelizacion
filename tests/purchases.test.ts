@@ -81,11 +81,11 @@ describe("registerPurchase", () => {
     expect(r.purchase.pointsAwarded).toBe(3);
   });
 
-  it("rechaza QR inexistente e importes inválidos", async () => {
+  it("rechaza DNI no registrado e importes inválidos", async () => {
     const m = await createMerchant(db);
     await expect(
       registerPurchase(db, m.employeeA, { branchId: m.branchA.id, dni: "99999999", amountCents: 10_000, idempotencyKey: key() }),
-    ).rejects.toMatchObject({ code: "not_found" });
+    ).rejects.toMatchObject({ code: "dni_not_registered" });
     const { customer } = await createCustomer(db);
     await expect(
       registerPurchase(db, m.employeeA, { branchId: m.branchA.id, dni: customer.dni!, amountCents: -5, idempotencyKey: key() }),
