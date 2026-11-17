@@ -5,6 +5,10 @@ import { notifyCounterRegistration, notifyPointsEarned } from "@/server/services
 import { registerPurchase } from "@/server/services/purchases";
 import { createMerchant, key, newDni, setupTestDb } from "./helpers";
 
+const sendMail = vi.fn(async () => ({}));
+const createTransport = vi.fn(() => ({ sendMail }));
+vi.mock("nodemailer", () => ({ default: { createTransport: (...args: unknown[]) => createTransport(...(args as [])) } }));
+
 let db: Db;
 let close: () => Promise<void>;
 
@@ -15,6 +19,8 @@ afterAll(async () => close());
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.unstubAllEnvs();
+  sendMail.mockClear();
+  createTransport.mockClear();
 });
 
 describe("aviso al sumar puntos", () => {
@@ -36,6 +42,32 @@ describe("aviso al sumar puntos", () => {
     expect(body).toMatchObject({ to: "juan@example.com", subject: "+3 puntos en Comercio" });
     expect(body.text).toContain("Saldo: 3 puntos");
     expect(body.text).toContain("/registro");
+  });
+
+  it("con SMTP configurado (Gmail) envía por SMTP y no por Resend", async () => {
+    vi.stubEnv("SMTP_HOST", "smtp.gmail.com");
+    vi.stubEnv("SMTP_USER", "puntos.demo@gmail.com");
+    vi.stubEnv("SMTP_PASSWORD", "app-password");
+    vi.stubEnv("RESEND_API_KEY", "re_test");
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const m = await createMerchant(db);
+    const dni = newDni();
+    await registerCustomerAtCounter(db, m.employeeA, { branchId: m.branchA.id, dni, fullName: "Ana Ruiz", email: "ana@example.com", acceptPrivacy: true });
+    const r = await registerPurchase(db, m.employeeA, { branchId: m.branchA.id, dni, amountCents: 30_000, idempotencyKey: key() });
+
+    await notifyPointsEarned(db, r.purchase.id);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(createTransport).toHaveBeenCalledWith({
+      host: "smtp.gmail.com",
+      port: 465,
+      secure: true,
+      auth: { user: "puntos.demo@gmail.com", pass: "app-password" },
+    });
+    expect(sendMail).toHaveBeenCalledWith(
+      expect.objectContaining({ from: "puntos.demo@gmail.com", to: "ana@example.com", subject: "+3 puntos en Comercio" }),
+    );
   });
 
   it("sin email ni Wallet no intenta enviar nada", async () => {
