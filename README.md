@@ -43,7 +43,7 @@ pnpm dev
 4. Los empleados se registran en `/registro/comercio` como "Soy empleado" y el dueño los asigna desde `/comercio`.
 5. Opcional: `pnpm admin:promote tu@email.com` (cuenta de personal) para ver `/admin`.
 6. Los clientes escanean el QR del mostrador, entran con Google y cargan su DNI una sola vez; o el empleado los registra en la caja ("Cliente nuevo") con DNI y nombre, y después suma la compra.
-7. Cada compra avisa al cliente (email con `RESEND_API_KEY`/`EMAIL_FROM`, y su tarjeta de Google Wallet si la guardó). Desde la app puede marcar "No reconozco esta compra" y el dueño la ve marcada.
+7. Cada compra avisa al cliente (email por SMTP —p. ej. Gmail— o Resend, ver `.env.example`; y su tarjeta de Google Wallet si la guardó). Desde la app puede marcar "No reconozco esta compra" y el dueño la ve marcada.
 8. Completar `/privacidad` (los campos entre corchetes), revisarla con un abogado e inscribir la base ante la AAIP antes de usarla con clientes reales.
 
 ## Login con Google
